@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenith Passkeys</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- First-run view -->
+    <div id="view-firstrun" class="view hidden">
+      <h2>Create Vault</h2>
+      <input type="password" id="fr-password" placeholder="Master password" />
+      <input type="password" id="fr-confirm" placeholder="Confirm password" />
+      <button id="fr-create">Create Vault</button>
+      <div id="fr-recovery" class="hidden">
+        <p class="warning">SAVE THIS RECOVERY KEY</p>
+        <pre id="fr-recovery-key"></pre>
+        <label><input type="checkbox" id="fr-checkbox" /> I have saved this key</label>
+        <button id="fr-continue" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- Unlock view -->
+    <div id="view-unlock" class="view hidden">
+      <h2>Unlock Vault</h2>
+      <input type="password" id="ul-password" placeholder="Master password" />
+      <button id="ul-unlock">Unlock</button>
+      <a id="ul-recovery" href="#">Use Recovery Key</a>
+    </div>
+
+    <!-- Main view -->
+    <div id="view-main" class="view hidden">
+      <div class="tabs">
+        <button class="tab active" data-tab="credentials">Credentials</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <div id="tab-credentials" class="tab-content">
+        <input type="text" id="cred-search" placeholder="Search by domain..." />
+        <div id="cred-list"></div>
+      </div>
+
+      <div id="tab-settings" class="tab-content hidden">
+        <div class="setting-row">
+          <label>Idle timeout (min)</label>
+          <select id="set-timeout">
+            <option value="5">5</option>
+            <option value="15" selected>15</option>
+            <option value="30">30</option>
+            <option value="60">60</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>Native host</label>
+          <span id="set-host-status">Checking...</span>
+        </div>
+        <button id="set-lock" class="btn-secondary">Lock Now</button>
+      </div>
+    </div>
+
+    <!-- Fallback banner -->
+    <div id="fallback-banner" class="hidden">
+      ⚠️ Running without backup sync. Install zenith-passkeys CLI for full backup support.
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

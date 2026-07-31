@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Zenith Passkeys",
+  "version": "1.0.0",
+  "description": "Local-first passkey manager with encrypted vault",
+  "permissions": ["nativeMessaging", "storage", "activeTab"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["content-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["content-isolated.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {"16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png"}
+  },
+  "icons": {"16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png"},
+  "web_accessible_resources": [
+    {"resources": ["content-main.js"], "matches": ["https://*/*", "http://*/*"]}
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "zenith-passkeys@zenith.dev"
+    }
+  }
+}

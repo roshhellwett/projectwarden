@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenith Passkeys</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      text-align: center;
+      padding: 24px;
+    }
+    .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    h2 { margin-bottom: 8px; color: #fff; }
+    .origin { color: #7c3aed; font-weight: bold; margin-bottom: 4px; font-size: 18px; }
+    .action { color: #a0a0b0; margin-bottom: 24px; font-size: 14px; }
+    .username { color: #a0a0b0; margin-bottom: 24px; font-size: 13px; }
+    .buttons { display: flex; gap: 12px; justify-content: center; }
+    button {
+      padding: 10px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.9; }
+    .allow { background: #7c3aed; color: #fff; }
+    .deny { background: #333; color: #a0a0b0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">🔑</div>
+    <h2>Passkey Request</h2>
+    <div class="origin" id="origin"></div>
+    <div class="action" id="action"></div>
+    <div class="username" id="username"></div>
+    <div class="buttons">
+      <button class="deny" onclick="deny()">Deny</button>
+      <button class="allow" onclick="allow()">Allow</button>
+    </div>
+  </div>
+  <script src="confirm.js"></script>
+</body>
+</html>
