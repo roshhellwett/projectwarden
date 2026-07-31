@@ -4,6 +4,15 @@ import json
 
 MAX_MESSAGE_SIZE = 1024 * 1024
 
+if sys.platform == "win32":
+    import msvcrt
+    import os
+    try:
+        msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+        msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+    except Exception:
+        pass
+
 def read_message() -> dict | None:
     raw_length = sys.stdin.buffer.read(4)
     if len(raw_length) < 4:
