@@ -71,6 +71,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     return true;
   }
+  if (['unlock', 'create_vault', 'list_credentials', 'lock', 'get_settings', 'update_settings'].includes(msg.action)) {
+    if (useFallback) {
+      if (msg.action === 'create_vault') ZenithFallback.createVault(msg.password).then(res => sendResponse({recovery_key: res})).catch(e => sendResponse({error: e.message}));
+      else if (msg.action === 'unlock') ZenithFallback.unlockVault(msg.password).then(res => sendResponse({success: res})).catch(e => sendResponse({error: e.message}));
+      else if (msg.action === 'list_credentials') ZenithFallback.listCredentials().then(res => sendResponse({credentials: res})).catch(e => sendResponse({error: e.message}));
+      else if (msg.action === 'lock') ZenithFallback.lockVault().then(() => sendResponse({success: true})).catch(e => sendResponse({error: e.message}));
+      else sendResponse({error: 'Not supported in fallback'});
+    } else {
+      sendToNative(msg.action, msg)
+        .then(result => sendResponse(result))
+        .catch(err => sendResponse({error: err.message}));
+    }
+    return true;
+  }
 });
 
 async function handleWebAuthnRequest(msg, sender) {
