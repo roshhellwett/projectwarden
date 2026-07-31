@@ -3,7 +3,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from ..core.vault import VaultManager
-from ..core.crypto import VaultHeader, HEADER_SIZE, DEFAULT_KDF_ITERATIONS, DEFAULT_KDF_MEMORY, DEFAULT_KDF_LANES, derive_key, encrypt_aes_gcm
+from ..core.crypto import VaultHeader, HEADER_SIZE_V1, HEADER_SIZE_V2, DEFAULT_KDF_ITERATIONS, DEFAULT_KDF_MEMORY, DEFAULT_KDF_LANES, derive_key, encrypt_aes_gcm
 from ..core.recovery import parse_recovery_key
 from ..native_host.manifest import register_native_host
 from cryptography.exceptions import InvalidTag
@@ -40,14 +40,37 @@ def init(recover: bool):
         with vault.lock:
             raw = vault.vault_path.read_bytes()
             header = VaultHeader.from_bytes(raw)
-            dk_new = derive_key(new_password.encode(), header.kdf_salt, header.kdf_iterations, header.kdf_memory, header.kdf_lanes)
+            aad = header.aad() if header.version >= 2 else None
+            dk_new = derive_key(new_password.encode(), header.pw_salt, header.kdf_iterations, header.kdf_memory, header.kdf_lanes)
+            
+            old_aad = aad
+            # Rotate pw_salt if V2
+            if header.version >= 2:
+                header.pw_salt = os.urandom(16)
+                aad = header.aad()
+                dk_new = derive_key(new_password.encode(), header.pw_salt, header.kdf_iterations, header.kdf_memory, header.kdf_lanes)
+
             new_nonce = os.urandom(12)
-            new_wrapped = encrypt_aes_gcm(mek, dk_new, new_nonce)
+            new_wrapped = encrypt_aes_gcm(mek, dk_new, new_nonce, aad)
             header.pw_wrapped_nonce = new_nonce
             header.pw_wrapped_mek = new_wrapped
-            payload_ct = raw[HEADER_SIZE:]
+            
+            if header.version >= 2:
+                payload_ct = raw[header.size():]
+                # AAD for payload might have changed due to pw_salt change
+                payload_json = decrypt_aes_gcm(payload_ct, mek, header.payload_nonce, old_aad)
+                new_payload_nonce = os.urandom(12)
+                payload_ct = encrypt_aes_gcm(payload_json, mek, new_payload_nonce, aad)
+                header.payload_nonce = new_payload_nonce
+            else:
+                payload_ct = raw[header.size():]
+            
             tmp = vault.vault_path.with_suffix(".tmp")
-            tmp.write_bytes(header.to_bytes() + payload_ct)
+            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "wb") as f:
+                f.write(header.to_bytes() + payload_ct)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp, vault.vault_path)
         console.print("[green]Vault recovered successfully.[/green]")
         register_native_host()

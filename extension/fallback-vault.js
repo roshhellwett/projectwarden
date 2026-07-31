@@ -28,7 +28,8 @@ const ZenithFallback = (() => {
 
   async function getKeyFromPassword(password, salt) {
     const enc = new TextEncoder();
-    const pwKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey', 'deriveBits']);
+    const pwBytes = enc.encode(password);
+    const pwKey = await crypto.subtle.importKey('raw', pwBytes, 'PBKDF2', false, ['deriveKey', 'deriveBits']);
     const key = await crypto.subtle.deriveKey(
       { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
       pwKey,
@@ -36,13 +37,12 @@ const ZenithFallback = (() => {
       false,
       ['encrypt', 'decrypt']
     );
+    pwBytes.fill(0);
     return key;
   }
 
-  async function encrypt(data, password) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
+  async function encryptWithKey(data, key, salt) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await getKeyFromPassword(password, salt);
     const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
     const combined = new Uint8Array(salt.length + iv.length + ct.byteLength);
     combined.set(salt, 0);
@@ -57,16 +57,81 @@ const ZenithFallback = (() => {
     const ct = data.slice(28);
     const key = await getKeyFromPassword(password, salt);
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
-    return new Uint8Array(plain);
+    return { plain: new Uint8Array(plain), key, salt };
   }
 
+  let unlockedVault = null;
+  let sessionKey = null;
+  let sessionSalt = null;
+
   async function getVault() {
-    const result = await chrome.storage.local.get('zenith_vault');
-    return result.zenith_vault ? JSON.parse(result.zenith_vault) : { version: 1, credentials: [], settings: {} };
+    if (unlockedVault) return unlockedVault;
+    throw new Error('Vault is locked');
   }
 
   async function saveVault(vault) {
-    await chrome.storage.local.set({ zenith_vault: JSON.stringify(vault) });
+    if (!sessionKey || !sessionSalt) throw new Error('Vault is locked');
+    const data = new TextEncoder().encode(JSON.stringify(vault));
+    const encrypted = await encryptWithKey(data, sessionKey, sessionSalt);
+    data.fill(0);
+    await chrome.storage.local.set({ zenith_vault: base64urlEncode(encrypted) });
+    encrypted.fill(0);
+    unlockedVault = vault;
+  }
+
+  async function createVault(password) {
+    const data = await chrome.storage.local.get('zenith_vault');
+    if (data.zenith_vault) throw new Error('Vault already exists');
+    
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    sessionKey = await getKeyFromPassword(password, salt);
+    sessionSalt = salt;
+    const initialVault = { version: 1, credentials: [], settings: {} };
+    await saveVault(initialVault);
+    return 'fallback-no-recovery-key';
+  }
+
+  async function unlockVault(password) {
+    const data = await chrome.storage.local.get('zenith_vault');
+    if (!data.zenith_vault) throw new Error('No vault found');
+    
+    const encrypted = base64urlDecode(data.zenith_vault);
+    try {
+      const { plain, key, salt } = await decrypt(encrypted, password);
+      unlockedVault = JSON.parse(new TextDecoder().decode(plain));
+      sessionKey = key;
+      sessionSalt = salt;
+      plain.fill(0);
+      encrypted.fill(0);
+      return true;
+    } catch (e) {
+      throw new Error('Wrong password');
+    }
+  }
+
+  async function listCredentials() {
+    const vault = await getVault();
+    return vault.credentials.map(c => ({
+      rpId: c.rp_id,
+      credentialId: c.credential_id,
+      username: c.username,
+      createdAt: c.created_at,
+      lastUsedAt: c.last_used_at,
+      counter: c.counter
+    }));
+  }
+
+  async function lockVault() {
+    unlockedVault = null;
+    sessionKey = null;
+    sessionSalt = null;
+  }
+
+  function isValidRpId(rpId, origin) {
+    if (!rpId) return true;
+    let hostname;
+    try { hostname = new URL(origin).hostname; } catch (e) { return false; }
+    return hostname === rpId || hostname.endsWith('.' + rpId);
   }
 
   async function handleCreate(options, origin) {
@@ -76,6 +141,7 @@ const ZenithFallback = (() => {
     const pkcs8 = await crypto.subtle.exportKey('pkcs8', privateKey);
     const credentialId = crypto.getRandomValues(new Uint8Array(32));
     const rpId = options.rp && options.rp.id ? options.rp.id : new URL(origin).hostname;
+    if (!isValidRpId(rpId, origin)) throw new Error('Security Error: Invalid rpId for origin');
     const userHandle = options.user && options.user.id ? base64urlDecode(options.user.id) : crypto.getRandomValues(new Uint8Array(16));
     const username = options.user && (options.user.displayName || options.user.name) ? (options.user.displayName || options.user.name) : '';
 
@@ -95,11 +161,11 @@ const ZenithFallback = (() => {
     fullAuthData.set(new Uint8Array(pubKey), attestedOffset + 18 + credentialId.length);
 
     const attestationObject = { fmt: 'none', attStmt: {}, authData: Array.from(fullAuthData) };
-
+    const pkcs8Arr = new Uint8Array(pkcs8);
     const credEntry = {
       rp_id: rpId,
       credential_id: base64urlEncode(credentialId),
-      private_key: base64urlEncode(new Uint8Array(pkcs8)),
+      private_key: base64urlEncode(pkcs8Arr),
       public_key: base64urlEncode(new Uint8Array(pubKey)),
       user_handle: base64urlEncode(userHandle),
       username,
@@ -108,6 +174,7 @@ const ZenithFallback = (() => {
       last_used_at: null,
       algorithm: -7,
     };
+    pkcs8Arr.fill(0);
 
     vault.credentials.push(credEntry);
     await saveVault(vault);
@@ -129,6 +196,7 @@ const ZenithFallback = (() => {
   async function handleGet(options, origin) {
     const vault = await getVault();
     const rpId = options.rpId || new URL(origin).hostname;
+    if (!isValidRpId(rpId, origin)) throw new Error('Security Error: Invalid rpId for origin');
     let creds = vault.credentials.filter(c => c.rp_id === rpId);
     if (options.allowCredentials && options.allowCredentials.length) {
       const allowedIds = options.allowCredentials.map(c => c.id);
@@ -156,6 +224,7 @@ const ZenithFallback = (() => {
     const pkcs8 = base64urlDecode(cred.private_key);
     const privateKey = await crypto.subtle.importKey('pkcs8', pkcs8, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
     const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, signedData);
+    pkcs8.fill(0);
 
     cred.counter = newCounter;
     cred.last_used_at = new Date().toISOString();
@@ -177,5 +246,5 @@ const ZenithFallback = (() => {
     };
   }
 
-  return { handleCreate, handleGet };
+  return { handleCreate, handleGet, createVault, unlockVault, listCredentials, lockVault };
 })();

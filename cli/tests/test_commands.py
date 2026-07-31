@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 from zenith_passkeys.main import cli
@@ -15,7 +16,8 @@ def test_help():
     for cmd in ["init", "list", "export", "import", "backup", "audit", "lock", "config"]:
         assert cmd in result.output
 
-def test_list_no_vault():
+@patch("zenith_passkeys.core.vault.VaultManager.exists", return_value=False)
+def test_list_no_vault(mock_exists):
     runner = CliRunner()
     result = runner.invoke(cli, ["list"], input="test\n")
     assert result.exit_code == 1

@@ -66,6 +66,18 @@ async function loadCredentials() {
   }
 }
 
+function escapeHTML(str) {
+  return String(str).replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}
+
 function renderCredentials(creds) {
   const list = document.getElementById('cred-list');
   if (!creds.length) {
@@ -82,8 +94,8 @@ function renderCredentials(creds) {
     entries.forEach(c => {
       const last = c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleDateString() : 'Never';
       html += `<div class="cred-item">
-        <div class="domain">${domain}</div>
-        <div class="username">${c.username}</div>
+        <div class="domain">${escapeHTML(domain)}</div>
+        <div class="username">${escapeHTML(c.username)}</div>
         <div class="last-used">Used: ${last}</div>
       </div>`;
     });

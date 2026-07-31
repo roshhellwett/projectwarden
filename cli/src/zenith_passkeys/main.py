@@ -15,8 +15,7 @@ class ErrorHandlingGroup(click.Group):
         except click.exceptions.Exit:
             raise
         except Exception as e:
-            tb = traceback.format_exc()
-            error_code = base64.b64encode(tb.encode("utf-8")).decode("utf-8")
+            error_code = base64.b64encode(str(e).encode("utf-8")).decode("utf-8")
             
             console = Console()
             console.print()

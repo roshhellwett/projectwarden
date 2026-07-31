@@ -26,9 +26,8 @@ class NativeHost:
                 resp["requestId"] = msg.get("requestId")
                 send_message(resp)
         except Exception as e:
-            import traceback, base64
-            tb = traceback.format_exc()
-            error_code = base64.b64encode(tb.encode("utf-8")).decode("utf-8")
+            import base64
+            error_code = base64.b64encode(str(e).encode("utf-8")).decode("utf-8")
             try:
                 send_message({"error": "Fatal host error", "errorCode": error_code})
             except Exception:
@@ -40,7 +39,10 @@ class NativeHost:
 
     def _lock(self):
         self.payload = None
-        self.mek = None
+        if self.mek is not None:
+            if isinstance(self.mek, bytearray):
+                self.mek[:] = b'\x00' * len(self.mek)
+            self.mek = None
         gc.collect()
 
     def _dispatch(self, msg: dict) -> dict:
@@ -63,9 +65,8 @@ class NativeHost:
                 return {"error": f"Unknown action: {action}"}
             return handler(msg)
         except Exception as e:
-            import traceback, base64
-            tb = traceback.format_exc()
-            error_code = base64.b64encode(tb.encode("utf-8")).decode("utf-8")
+            import base64
+            error_code = base64.b64encode(str(e).encode("utf-8")).decode("utf-8")
             return {"error": str(e), "errorCode": error_code}
 
     def _ping(self, msg): return {"status": "ok", "version": "1.0.0"}
@@ -82,11 +83,21 @@ class NativeHost:
     def _unlock(self, msg):
         password = msg.get("password", "")
         self.payload, self.mek = self.vault.unlock(password)
+        self.idle_timeout = self.payload.settings.idle_timeout_minutes * 60
         return {"success": True, "credential_count": len(self.payload.credentials)}
 
     def _do_lock(self, msg):
         self._lock()
         return {"success": True}
+
+    def _validate_rp_id(self, rp_id: str, origin: str) -> bool:
+        if not rp_id:
+            return True
+        from urllib.parse import urlparse
+        hostname = urlparse(origin).hostname
+        if not hostname:
+            return False
+        return hostname == rp_id or hostname.endswith("." + rp_id)
 
     def _create_credential(self, msg):
         if not self.mek:
@@ -94,14 +105,17 @@ class NativeHost:
         options = msg.get("options", {})
         origin = msg.get("origin", "")
         rp_id = options.get("rp", {}).get("id", "")
+        if not self._validate_rp_id(rp_id, origin):
+            return {"error": f"Security Error: Invalid rpId {rp_id} for origin {origin}"}
         challenge = options.get("challenge", "")
         user = options.get("user", {})
         user_handle = base64url_decode(user.get("id", ""))
         username = user.get("displayName", user.get("name", ""))
 
         response, cred = create_credential_response(rp_id, origin, challenge, user_handle, username)
-        self.payload = add_credential(self.payload, cred)
-        self.vault.save(self.payload, self.mek)
+        def updater(p):
+            return add_credential(p, cred)
+        self.payload = self.vault.update(updater, self.mek)
         return {"credential": response}
 
     def _get_assertion(self, msg):
@@ -110,6 +124,8 @@ class NativeHost:
         options = msg.get("options", {})
         origin = msg.get("origin", "")
         rp_id = options.get("rpId", "")
+        if not self._validate_rp_id(rp_id, origin):
+            return {"error": f"Security Error: Invalid rpId {rp_id} for origin {origin}"}
         challenge = options.get("challenge", "")
         allow_list = None
         if "allowCredentials" in options:
@@ -123,8 +139,9 @@ class NativeHost:
 
         cred = candidates[0]
         response, new_counter = get_assertion_response(cred, rp_id, origin, challenge)
-        self.payload = update_counter(self.payload, cred.credential_id, new_counter)
-        self.vault.save(self.payload, self.mek)
+        def updater(p):
+            return update_counter(p, cred.credential_id, new_counter)
+        self.payload = self.vault.update(updater, self.mek)
         return {"assertion": response}
 
     def _list_credentials(self, msg):
@@ -150,11 +167,28 @@ class NativeHost:
         if not self.mek:
             return {"error": "Vault is locked"}
         updates = msg.get("settings", {})
-        for key, value in updates.items():
-            if hasattr(self.payload.settings, key):
-                setattr(self.payload.settings, key, value)
-        self.vault.save(self.payload, self.mek)
-        return {"success": True}
+        
+        def updater(p):
+            import copy
+            old_settings = copy.deepcopy(p.settings)
+            for key, value in updates.items():
+                if key.startswith("_"):
+                    continue
+                if hasattr(p.settings, key):
+                    setattr(p.settings, key, value)
+            try:
+                p.settings.validate()
+            except ValueError as e:
+                p.settings = old_settings
+                raise ValueError(str(e))
+            return p
+            
+        try:
+            self.payload = self.vault.update(updater, self.mek)
+            self.idle_timeout = self.payload.settings.idle_timeout_minutes * 60
+            return {"success": True}
+        except ValueError as e:
+            return {"error": str(e)}
 
 def main():
     host = NativeHost()

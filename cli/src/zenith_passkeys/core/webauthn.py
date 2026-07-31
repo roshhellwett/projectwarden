@@ -90,8 +90,9 @@ def create_credential_response(rp_id: str, origin: str, challenge_b64url: str,
 
 def get_assertion_response(credential: Credential, rp_id: str, origin: str,
                               challenge_b64url: str) -> tuple[dict, int]:
-    private_key_bytes = base64url_decode(credential.private_key)
-    private_key = serialization.load_der_private_key(private_key_bytes, password=None)
+    private_key_bytes = bytearray(base64url_decode(credential.private_key))
+    private_key = serialization.load_der_private_key(bytes(private_key_bytes), password=None)
+    private_key_bytes[:] = b'\x00' * len(private_key_bytes)
     new_counter = credential.counter + 1
     auth_data = build_authenticator_data(rp_id, 0x05, new_counter)
     client_data = {

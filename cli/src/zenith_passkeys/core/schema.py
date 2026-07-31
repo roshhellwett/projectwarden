@@ -21,6 +21,14 @@ class Settings:
     backup_provider: Optional[str] = None  # "gdrive" | None
     use_keyring: bool = False
 
+    def validate(self):
+        if not isinstance(self.idle_timeout_minutes, int) or getattr(self, 'idle_timeout_minutes', 0) < 1:
+            raise ValueError("idle_timeout_minutes must be an integer >= 1")
+        if self.backup_provider is not None and not isinstance(self.backup_provider, str):
+            raise ValueError("backup_provider must be a string or None")
+        if not isinstance(self.use_keyring, bool):
+            raise ValueError("use_keyring must be a boolean")
+
 @dataclass
 class VaultPayload:
     version: int = 1
@@ -36,4 +44,5 @@ class VaultPayload:
         d = json.loads(data.decode("utf-8"))
         creds = [Credential(**c) for c in d.get("credentials", [])]
         settings = Settings(**d.get("settings", {}))
+        settings.validate()
         return cls(version=d.get("version", 1), credentials=creds, settings=settings)

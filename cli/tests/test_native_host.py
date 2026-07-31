@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 from zenith_passkeys.native_host.protocol import MAX_MESSAGE_SIZE
 from zenith_passkeys.native_host.host import NativeHost
@@ -14,7 +15,8 @@ def test_host_ping():
     assert resp["status"] == "ok"
     assert resp["version"] == "1.0.0"
 
-def test_host_no_vault():
+@patch("zenith_passkeys.core.vault.VaultManager.exists", return_value=False)
+def test_host_no_vault(mock_exists):
     host = NativeHost()
     resp = host._vault_exists({})
     assert resp["exists"] is False

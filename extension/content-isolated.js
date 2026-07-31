@@ -2,9 +2,11 @@
   const PREFIX = '__zenith_passkeys__';
 
   window.addEventListener('message', async (event) => {
+    if (event.source !== window) return;
     if (!event.data || event.data.type !== PREFIX + '_request') return;
 
-    const { requestId, action, options, origin } = event.data;
+    const { requestId, action, options } = event.data;
+    const origin = window.location.origin;
 
     try {
       const result = await chrome.runtime.sendMessage({

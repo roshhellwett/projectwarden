@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import click
 from rich.console import Console
 from rich.table import Table
+from rich.markup import escape
 from ..core.vault import VaultManager
 from cryptography.exceptions import InvalidTag
 
@@ -80,6 +81,6 @@ def audit(unused_days: int, json_flag: bool):
         table.add_column("Domain", style="white")
         table.add_column("Detail", style="white")
         for issue in issues:
-            table.add_row(issue["severity"], issue["type"], issue["rp_id"], issue["detail"])
+            table.add_row(escape(issue["severity"]), escape(issue["type"]), escape(issue["rp_id"]), escape(issue["detail"]))
         console.print(table)
         raise SystemExit(1)

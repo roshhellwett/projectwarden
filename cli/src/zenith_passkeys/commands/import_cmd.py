@@ -6,6 +6,7 @@ from ..core.vault import VaultManager
 from ..core.schema import Credential
 from ..core.crypto import derive_key, decrypt_aes_gcm, DEFAULT_KDF_ITERATIONS, DEFAULT_KDF_MEMORY, DEFAULT_KDF_LANES
 from cryptography.exceptions import InvalidTag
+from rich.markup import escape
 
 console = Console()
 
@@ -25,6 +26,10 @@ def import_vault(file: str):
         console.print("[red]Wrong password.[/red]")
         raise SystemExit(1)
 
+    if os.path.getsize(file) > 50 * 1024 * 1024:
+        console.print("[red]Import file is too large (max 50MB).[/red]")
+        raise SystemExit(1)
+        
     with open(file, "rb") as f:
         blob = f.read()
 
@@ -52,7 +57,9 @@ def import_vault(file: str):
     console.print(f"Found {len(imported)} credential(s) to import.")
     skip_all = False
     overwrite_all = False
-    added = 0
+    to_add = []
+    to_overwrite = []
+    
     for c_data in imported:
         cred = Credential(**c_data)
         existing = [e for e in payload.credentials if e.rp_id == cred.rp_id and e.credential_id == cred.credential_id]
@@ -60,32 +67,33 @@ def import_vault(file: str):
             if skip_all:
                 continue
             if overwrite_all:
-                payload.credentials = [e for e in payload.credentials if not (e.rp_id == cred.rp_id and e.credential_id == cred.credential_id)]
-                payload.credentials.append(cred)
-                added += 1
+                to_overwrite.append(cred)
                 continue
             choice = Prompt.ask(
-                f"[yellow]Credential {cred.rp_id}/{cred.username} exists. Skip/Overwrite/All-skip/All-overwrite?[/yellow]",
+                f"[yellow]Credential {escape(cred.rp_id)}/{escape(cred.username)} exists. Skip/Overwrite/All-skip/All-overwrite?[/yellow]",
                 choices=["s", "o", "as", "ao"],
                 default="s",
             )
             if choice == "s":
                 continue
             elif choice == "o":
-                payload.credentials = [e for e in payload.credentials if not (e.rp_id == cred.rp_id and e.credential_id == cred.credential_id)]
-                payload.credentials.append(cred)
-                added += 1
+                to_overwrite.append(cred)
             elif choice == "as":
                 skip_all = True
-                continue
             elif choice == "ao":
                 overwrite_all = True
-                payload.credentials = [e for e in payload.credentials if not (e.rp_id == cred.rp_id and e.credential_id == cred.credential_id)]
-                payload.credentials.append(cred)
-                added += 1
+                to_overwrite.append(cred)
         else:
-            payload.credentials.append(cred)
-            added += 1
+            to_add.append(cred)
 
-    vault.save(payload, mek)
-    console.print(f"[green]Imported {added} credential(s).[/green]")
+    def updater(p):
+        for cred in to_overwrite:
+            p.credentials = [e for e in p.credentials if not (e.rp_id == cred.rp_id and e.credential_id == cred.credential_id)]
+            p.credentials.append(cred)
+        for cred in to_add:
+            if not any(e.rp_id == cred.rp_id and e.credential_id == cred.credential_id for e in p.credentials):
+                p.credentials.append(cred)
+        return p
+
+    vault.update(updater, mek)
+    console.print(f"[green]Imported {len(to_add) + len(to_overwrite)} credential(s).[/green]")

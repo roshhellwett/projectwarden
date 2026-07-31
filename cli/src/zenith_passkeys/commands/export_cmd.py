@@ -62,7 +62,11 @@ def export(out: str, password: bool):
             return
         blob = json.dumps(export_data).encode("utf-8")
 
-    with open(out, "wb") as f:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(out, flags, 0o600)
+    with os.fdopen(fd, "wb") as f:
         f.write(blob)
+        f.flush()
+        os.fsync(f.fileno())
 
     console.print(f"[green]Export written to {out}[/green]")

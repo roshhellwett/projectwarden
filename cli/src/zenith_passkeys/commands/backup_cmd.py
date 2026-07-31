@@ -58,6 +58,19 @@ def pull(provider: str):
         console.print(f"[red]No backup found on {provider}.[/red]")
         raise SystemExit(1)
 
+    if len(blob) > 50 * 1024 * 1024:
+        console.print("[red]Backup file is too large (max 50MB).[/red]")
+        raise SystemExit(1)
+        
+    from ..core.vault import VaultHeader
+    try:
+        header = VaultHeader.from_bytes(blob)
+        if len(blob) < header.size() + 16:
+            raise ValueError("Invalid payload size")
+    except Exception:
+        console.print("[red]Backup file is corrupted or not a valid vault.[/red]")
+        raise SystemExit(1)
+
     if vault.exists():
         confirm = click.confirm("Local vault exists. Overwrite?", default=False)
         if not confirm:
@@ -66,8 +79,16 @@ def pull(provider: str):
 
     with vault.lock:
         vault.vault_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            vault.vault_path.parent.chmod(0o700)
+        except Exception:
+            pass
         tmp = vault.vault_path.with_suffix(".tmp")
-        tmp.write_bytes(blob)
+        fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(blob)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, vault.vault_path)
 
     console.print(f"[green]Backup restored from {provider}.[/green]")

@@ -6,6 +6,7 @@ from rich.panel import Panel
 from ..core.vault import VaultManager
 from cryptography.exceptions import InvalidTag
 from datetime import datetime, timezone
+from rich.markup import escape
 
 console = Console()
 
@@ -68,6 +69,6 @@ def list_credentials(json_flag: bool, domain: str | None, unused_days: int | Non
                 last = dt.strftime("%Y-%m-%d")
             except ValueError:
                 pass
-        table.add_row(c.rp_id, c.username, c.created_at[:10] if c.created_at else "—", last, str(c.counter))
+        table.add_row(escape(c.rp_id), escape(c.username), escape(c.created_at[:10] if c.created_at else "—"), escape(last), str(c.counter))
 
     console.print(table)

@@ -76,6 +76,7 @@
     return new Promise((resolve, reject) => {
       const requestId = Date.now() + Math.random();
       const handler = (event) => {
+        if (event.source !== window) return;
         if (event.data && event.data.type === PREFIX + '_response' && event.data.requestId === requestId) {
           window.removeEventListener('message', handler);
           if (event.data.error) {

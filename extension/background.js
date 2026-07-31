@@ -5,6 +5,15 @@ let useFallback = false;
 let pendingRequests = {};
 let confirmWindows = {};
 
+chrome.windows.onRemoved.addListener((windowId) => {
+  for (const [confId, conf] of Object.entries(confirmWindows)) {
+    if (conf.windowId === windowId) {
+      conf.resolve(false);
+      delete confirmWindows[confId];
+    }
+  }
+});
+
 function tryConnectNative() {
   try {
     nativePort = chrome.runtime.connectNative('com.zenith.passkeys');
@@ -14,6 +23,10 @@ function tryConnectNative() {
       if (chrome.runtime.lastError) {
         console.log('Native host disconnected:', chrome.runtime.lastError.message);
       }
+      for (const reqId in pendingRequests) {
+        pendingRequests[reqId].reject(new Error('Native host disconnected'));
+      }
+      pendingRequests = {};
     });
     useFallback = false;
   } catch (e) {
@@ -25,7 +38,7 @@ function tryConnectNative() {
 function handleNativeMessage(msg) {
   const reqId = msg.requestId;
   if (reqId !== undefined && pendingRequests[reqId]) {
-    pendingRequests[reqId](msg);
+    pendingRequests[reqId].resolve(msg);
     delete pendingRequests[reqId];
   }
 }
@@ -33,17 +46,24 @@ function handleNativeMessage(msg) {
 function sendToNative(action, data) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now() + Math.random();
-    pendingRequests[requestId] = resolve;
+    pendingRequests[requestId] = { resolve, reject };
     const msg = { requestId, action, ...data };
+    
+    if (!nativePort && !useFallback) {
+      tryConnectNative();
+    }
+
     if (nativePort) {
       nativePort.postMessage(msg);
     } else {
+      delete pendingRequests[requestId];
       reject(new Error('Native host not connected'));
     }
     setTimeout(() => {
       if (pendingRequests[requestId]) {
+        const rej = pendingRequests[requestId].reject;
         delete pendingRequests[requestId];
-        reject(new Error('Native host timeout'));
+        rej(new Error('Native host timeout'));
       }
     }, 30000);
   });

@@ -25,11 +25,19 @@ def config(use_keyring: bool, idle_timeout: int | None):
     if use_keyring:
         import keyring
         keyring.set_password("zenith-passkeys", "master", password)
-        payload.settings.use_keyring = True
         console.print("[green]Password stored in OS keyring.[/green]")
+        
+    if idle_timeout is not None and idle_timeout < 1:
+        console.print("[red]Idle timeout must be at least 1 minute.[/red]")
+        raise SystemExit(1)
 
-    if idle_timeout is not None:
-        payload.settings.idle_timeout_minutes = idle_timeout
+    def updater(p):
+        if use_keyring:
+            p.settings.use_keyring = True
+        if idle_timeout is not None:
+            p.settings.idle_timeout_minutes = idle_timeout
+        p.settings.validate()
+        return p
 
-    vault.save(payload, mek)
+    vault.update(updater, mek)
     console.print("[green]Settings updated.[/green]")
