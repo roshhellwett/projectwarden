@@ -15,15 +15,24 @@ class NativeHost:
         self.idle_timeout = 900
 
     def run(self):
-        while True:
-            msg = read_message()
-            if msg is None:
-                break
-            self._check_idle()
-            self.last_activity = time.time()
-            resp = self._dispatch(msg)
-            resp["requestId"] = msg.get("requestId")
-            send_message(resp)
+        try:
+            while True:
+                msg = read_message()
+                if msg is None:
+                    break
+                self._check_idle()
+                self.last_activity = time.time()
+                resp = self._dispatch(msg)
+                resp["requestId"] = msg.get("requestId")
+                send_message(resp)
+        except Exception as e:
+            import traceback, base64
+            tb = traceback.format_exc()
+            error_code = base64.b64encode(tb.encode("utf-8")).decode("utf-8")
+            try:
+                send_message({"error": "Fatal host error", "errorCode": error_code})
+            except Exception:
+                pass
 
     def _check_idle(self):
         if self.mek and (time.time() - self.last_activity > self.idle_timeout):
@@ -54,7 +63,10 @@ class NativeHost:
                 return {"error": f"Unknown action: {action}"}
             return handler(msg)
         except Exception as e:
-            return {"error": str(e)}
+            import traceback, base64
+            tb = traceback.format_exc()
+            error_code = base64.b64encode(tb.encode("utf-8")).decode("utf-8")
+            return {"error": str(e), "errorCode": error_code}
 
     def _ping(self, msg): return {"status": "ok", "version": "1.0.0"}
     def _vault_exists(self, msg): return {"exists": self.vault.exists()}

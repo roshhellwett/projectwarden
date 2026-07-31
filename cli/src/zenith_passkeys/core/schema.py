@@ -18,7 +18,7 @@ class Credential:
 @dataclass
 class Settings:
     idle_timeout_minutes: int = 15
-    backup_provider: Optional[str] = None
+    backup_provider: Optional[str] = None  # "gdrive" | None
     use_keyring: bool = False
 
 @dataclass

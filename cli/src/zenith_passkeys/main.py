@@ -1,7 +1,37 @@
 import click
+import traceback
+import base64
+import sys
+from rich.console import Console
+from rich.panel import Panel
 from .commands import init_cmd, list_cmd, export_cmd, import_cmd, backup_cmd, audit_cmd, lock_cmd, config_cmd
 
-@click.group()
+class ErrorHandlingGroup(click.Group):
+    def invoke(self, ctx):
+        try:
+            return super().invoke(ctx)
+        except click.ClickException:
+            raise
+        except click.exceptions.Exit:
+            raise
+        except Exception as e:
+            tb = traceback.format_exc()
+            error_code = base64.b64encode(tb.encode("utf-8")).decode("utf-8")
+            
+            console = Console()
+            console.print()
+            console.print(Panel(
+                f"[bold red]An unexpected error occurred in Zenith Passkeys.[/bold red]\n\n"
+                f"We are sorry for the issue. Please copy the error code below\n"
+                f"and provide it to support for assistance.\n\n"
+                f"[bold yellow]Error Code:[/bold yellow]\n"
+                f"[dim]{error_code}[/dim]",
+                title="⚠️ Fatal Error",
+                border_style="red"
+            ))
+            sys.exit(1)
+
+@click.group(cls=ErrorHandlingGroup)
 @click.version_option(version="1.0.0", prog_name="zenith-passkeys")
 def cli():
     """Zenith Passkeys — local-first passkey manager."""

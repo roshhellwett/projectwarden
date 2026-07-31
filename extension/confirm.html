@@ -7,39 +7,99 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f7f9fc;
+      color: #1e293b;
       width: 100%;
       height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      -webkit-font-smoothing: antialiased;
     }
     .container {
       text-align: center;
-      padding: 24px;
+      padding: 32px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px -5px rgba(59, 91, 219, 0.1), 0 8px 10px -6px rgba(59, 91, 219, 0.1);
+      border: 1px solid #e2e8f0;
+      max-width: 320px;
+      width: 90%;
+      animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
     }
     .icon {
-      font-size: 48px;
-      margin-bottom: 16px;
+      font-size: 56px;
+      margin-bottom: 20px;
+      display: inline-block;
+      animation: float 3s ease-in-out infinite;
     }
-    h2 { margin-bottom: 8px; color: #fff; }
-    .origin { color: #7c3aed; font-weight: bold; margin-bottom: 4px; font-size: 18px; }
-    .action { color: #a0a0b0; margin-bottom: 24px; font-size: 14px; }
-    .username { color: #a0a0b0; margin-bottom: 24px; font-size: 13px; }
-    .buttons { display: flex; gap: 12px; justify-content: center; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    h2 { 
+      margin-bottom: 12px; 
+      color: #3b5bdb; 
+      font-weight: 600;
+      font-size: 22px;
+    }
+    .origin { 
+      color: #1e293b; 
+      font-weight: 600; 
+      margin-bottom: 6px; 
+      font-size: 16px; 
+      word-break: break-all;
+    }
+    .action { 
+      color: #64748b; 
+      margin-bottom: 8px; 
+      font-size: 14px; 
+      font-weight: 500;
+    }
+    .username { 
+      color: #64748b; 
+      margin-bottom: 28px; 
+      font-size: 13px; 
+    }
+    .buttons { 
+      display: flex; 
+      gap: 12px; 
+      justify-content: center; 
+    }
     button {
-      padding: 10px 32px;
+      flex: 1;
+      padding: 12px 0;
       border: none;
-      border-radius: 8px;
-      font-size: 15px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: all 0.2s ease;
     }
-    button:hover { opacity: 0.9; }
-    .allow { background: #7c3aed; color: #fff; }
-    .deny { background: #333; color: #a0a0b0; }
+    .allow { 
+      background: #3b5bdb; 
+      color: #ffffff; 
+      box-shadow: 0 4px 6px -1px rgba(59, 91, 219, 0.1);
+    }
+    .allow:hover {
+      background: #364fc7;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 8px -1px rgba(59, 91, 219, 0.15);
+    }
+    .deny { 
+      background: #f1f5f9; 
+      color: #64748b; 
+      border: 1px solid #e2e8f0;
+    }
+    .deny:hover {
+      background: #e2e8f0;
+      color: #1e293b;
+    }
   </style>
 </head>
 <body>
@@ -52,6 +112,12 @@
     <div class="buttons">
       <button class="deny" onclick="deny()">Deny</button>
       <button class="allow" onclick="allow()">Allow</button>
+    </div>
+    <div id="view-error" style="display: none;">
+      <h2 style="color: #ef4444; font-size: 18px;">⚠️ Error Occurred</h2>
+      <p style="color: #64748b; font-size: 13px; margin-bottom: 12px; line-height: 1.4;">We are sorry for the issue. Please provide this error code for assistance:</p>
+      <input type="text" id="error-code-input" readonly style="width: 100%; padding: 10px; margin-bottom: 12px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; color: #ef4444; font-family: monospace; font-size: 12px; text-align: center;" />
+      <button class="deny" id="error-copy-btn">Copy Error Code</button>
     </div>
   </div>
   <script src="confirm.js"></script>

@@ -110,7 +110,52 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.getElementById('set-lock').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ action: 'lock' });
-  showView('view-unlock');
+  initPopup();
 });
+
+// Global Error Handlers
+function showError(msg, code) {
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  const errView = document.getElementById('view-error');
+  errView.classList.remove('hidden');
+  const codeInput = document.getElementById('error-code-input');
+  codeInput.value = code || btoa(msg).substring(0, 50);
+}
+
+document.getElementById('error-copy-btn').addEventListener('click', (e) => {
+  const codeInput = document.getElementById('error-code-input');
+  codeInput.select();
+  document.execCommand('copy');
+  e.target.textContent = 'Copied!';
+  setTimeout(() => e.target.textContent = 'Copy Error Code', 2000);
+});
+
+window.addEventListener('error', (e) => {
+  showError(e.message, null);
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  showError(e.reason?.message || 'Unknown Promise Rejection', null);
+});
+
+// Intercept sendMessage to automatically catch errorCodes
+const originalSendMessage = chrome.runtime.sendMessage;
+chrome.runtime.sendMessage = function(message) {
+  return new Promise((resolve, reject) => {
+    originalSendMessage.call(chrome.runtime, message, (response) => {
+      if (chrome.runtime.lastError) {
+        showError(chrome.runtime.lastError.message, null);
+        return reject(chrome.runtime.lastError);
+      }
+      if (response && response.error) {
+        if (response.errorCode) {
+          showError(response.error, response.errorCode);
+        }
+        return reject(new Error(response.error));
+      }
+      resolve(response);
+    });
+  });
+};
 
 initPopup();

@@ -2,7 +2,8 @@ from ..core.paths import get_vault_dir
 
 CLIENT_CONFIG = {
     "installed": {
-        "client_id": "837689047203-ju6ql6jef6j9k5p3v1b8q7h4nq5a1d2e.apps.googleusercontent.com",
+        "client_id": "404572380586-mmt4kcaqs7svqn1dqq237o47jr6ikimb.apps.googleusercontent.com",
+        "client_secret": "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",
         "project_id": "zenith-passkeys",
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
         "token_uri": "https://oauth2.googleapis.com/token",

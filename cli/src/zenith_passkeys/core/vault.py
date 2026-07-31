@@ -18,6 +18,11 @@ class VaultManager:
         return self.vault_path.exists()
 
     def create(self, password: str) -> tuple[str, bytes]:
+        """Create a new vault. Returns (recovery_key_display, master_encryption_key)."""
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if self.exists():
+            raise FileExistsError("Vault already exists")
         from .recovery import generate_recovery_key
 
         mek = os.urandom(32)

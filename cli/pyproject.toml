@@ -33,11 +33,7 @@ gdrive = [
     "google-auth-oauthlib>=1.2",
     "google-auth-httplib2>=0.2",
 ]
-onedrive = [
-    "msal>=1.28",
-    "requests>=2.31",
-]
-all = ["zenith-passkeys[gdrive,onedrive]"]
+all = ["zenith-passkeys[gdrive]"]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",

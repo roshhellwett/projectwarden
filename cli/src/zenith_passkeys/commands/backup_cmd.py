@@ -12,7 +12,7 @@ def backup():
     pass
 
 @backup.command()
-@click.option("--provider", required=True, type=click.Choice(["gdrive", "onedrive"]))
+@click.option("--provider", default="gdrive", type=click.Choice(["gdrive"]))
 def push(provider: str):
     """Push vault to cloud backup."""
     vault = VaultManager()
@@ -30,12 +30,8 @@ def push(provider: str):
     with vault.lock:
         encrypted_blob = vault.vault_path.read_bytes()
 
-    if provider == "gdrive":
-        from ..backup.gdrive import GDriveProvider
-        prov = GDriveProvider()
-    else:
-        from ..backup.onedrive import OneDriveProvider
-        prov = OneDriveProvider()
+    from ..backup.gdrive import GDriveProvider
+    prov = GDriveProvider()
 
     if not prov.is_authenticated():
         console.print("[yellow]Authenticating...[/yellow]")
@@ -45,16 +41,13 @@ def push(provider: str):
     console.print(f"[green]Backup pushed to {provider}.[/green]")
 
 @backup.command()
-@click.option("--provider", required=True, type=click.Choice(["gdrive", "onedrive"]))
+@click.option("--provider", default="gdrive", type=click.Choice(["gdrive"]))
 def pull(provider: str):
     """Pull vault from cloud backup."""
     vault = VaultManager()
-    if provider == "gdrive":
-        from ..backup.gdrive import GDriveProvider
-        prov = GDriveProvider()
-    else:
-        from ..backup.onedrive import OneDriveProvider
-        prov = OneDriveProvider()
+
+    from ..backup.gdrive import GDriveProvider
+    prov = GDriveProvider()
 
     if not prov.is_authenticated():
         console.print("[yellow]Authenticating...[/yellow]")

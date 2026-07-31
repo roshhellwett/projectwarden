@@ -64,6 +64,13 @@
     <div id="fallback-banner" class="hidden">
       ⚠️ Running without backup sync. Install zenith-passkeys CLI for full backup support.
     </div>
+    <!-- Error view -->
+    <div id="view-error" class="view hidden" style="text-align: center; padding: 10px 0;">
+      <h2 style="color: var(--danger);">⚠️ Error Occurred</h2>
+      <p style="font-size: 14px; margin-bottom: 12px;">We are sorry for the issue. Please provide this error code for assistance:</p>
+      <input type="text" id="error-code-input" readonly style="font-family: monospace; font-size: 12px; color: var(--danger); border-color: var(--danger); text-align: center; margin-bottom: 12px;" />
+      <button id="error-copy-btn" class="btn-secondary">Copy Error Code</button>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

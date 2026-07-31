@@ -54,6 +54,9 @@ def init(recover: bool):
         return
 
     password = click.prompt("Master password", hide_input=True, confirmation_prompt=True)
+    if len(password) < 8:
+        console.print("[red]Password must be at least 8 characters.[/red]")
+        raise SystemExit(1)
     display_recovery, _ = vault.create(password)
     console.print()
     console.print(Panel(

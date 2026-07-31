@@ -1,3 +1,14 @@
+/**
+ * Fallback Vault — browser-only mode when native host is unavailable.
+ *
+ * IMPORTANT: This fallback uses PBKDF2-SHA256 via Web Crypto API (not Argon2id)
+ * and stores credentials in chrome.storage.local as JSON. Vaults created in
+ * fallback mode are NOT compatible with the CLI's vault.enc binary format.
+ *
+ * For full compatibility, install the zenith-passkeys CLI package and use
+ * the native messaging host. You can export from fallback mode and import
+ * into the CLI to migrate.
+ */
 const ZenithFallback = (() => {
   function base64urlEncode(buf) {
     const bytes = new Uint8Array(buf);

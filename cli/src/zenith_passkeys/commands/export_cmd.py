@@ -55,6 +55,11 @@ def export(out: str, password: bool):
         ct = encrypt_aes_gcm(json.dumps(export_data).encode("utf-8"), dk, nonce)
         blob = salt + nonce + ct
     else:
+        console.print("[bold yellow]⚠️  WARNING: Export file is NOT encrypted.[/bold yellow]")
+        console.print("[yellow]Anyone with access to this file can use your passkeys.[/yellow]")
+        if not click.confirm("Continue with unencrypted export?", default=False):
+            console.print("[yellow]Canceled.[/yellow]")
+            return
         blob = json.dumps(export_data).encode("utf-8")
 
     with open(out, "wb") as f:
