@@ -146,6 +146,6 @@
     }
     const serialized = serializeOptions(options);
     const result = await postAndWait('get', serialized.publicKey, window.location.origin);
-    return deserializeCredential(result.assertion);
+    return deserializeCredential(result.credential);
   };
 })();

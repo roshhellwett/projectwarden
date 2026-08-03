@@ -14,7 +14,7 @@ def add_credential(payload: VaultPayload, cred: Credential) -> VaultPayload:
 
 def find_credentials(payload: VaultPayload, rp_id: str, allow_list: list[str] | None = None) -> list[Credential]:
     results = [c for c in payload.credentials if c.rp_id == rp_id]
-    if allow_list is not None:
+    if allow_list:
         results = [c for c in results if c.credential_id in allow_list]
     return results
 

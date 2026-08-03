@@ -165,10 +165,8 @@ class NativeHost:
         candidates = find_credentials(self.payload, rp_id, allow_list)
         if not candidates:
             return {"error": f"No credentials found for {rp_id}"}
-        if len(candidates) > 1:
-            return {"candidates": [{"credentialId": c.credential_id, "username": c.username, "rpId": c.rp_id} for c in candidates]}
 
-        cred = candidates[0]
+        cred = candidates[-1]
         response, new_counter = get_assertion_response(cred, rp_id, origin, challenge)
         def updater(p):
             return update_counter(p, cred.credential_id, new_counter)

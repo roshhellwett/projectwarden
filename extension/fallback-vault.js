@@ -231,7 +231,7 @@ const ZenithFallback = (() => {
     await saveVault(vault);
 
     return {
-      assertion: {
+      credential: {
         id: cred.credential_id,
         rawId: cred.credential_id,
         type: 'public-key',
