@@ -15,7 +15,12 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Security",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "click>=8.1",
@@ -45,5 +50,7 @@ zenith-passkeys = "zenith_passkeys.main:cli"
 zenith-passkeys-host = "zenith_passkeys.native_host.host:main"
 
 [project.urls]
-Homepage = "https://github.com/user/zenith-passkeys"
-Repository = "https://github.com/user/zenith-passkeys"
+Homepage = "https://github.com/roshhellwett/projectwarden"
+Repository = "https://github.com/roshhellwett/projectwarden"
+Documentation = "https://github.com/roshhellwett/projectwarden/blob/main/docs/SETUP.md"
+Issues = "https://github.com/roshhellwett/projectwarden/issues"

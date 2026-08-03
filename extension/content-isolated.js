@@ -15,6 +15,15 @@
         origin,
       });
 
+      if (result && result.error) {
+        window.postMessage({
+          type: PREFIX + '_response',
+          requestId,
+          error: result.error,
+        }, '*');
+        return;
+      }
+
       window.postMessage({
         type: PREFIX + '_response',
         requestId,

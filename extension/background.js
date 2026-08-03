@@ -5,6 +5,7 @@ let useFallback = false;
 let pendingRequests = {};
 let confirmWindows = {};
 
+// ─── Window management for confirmation dialogs ──────────────────
 chrome.windows.onRemoved.addListener((windowId) => {
   for (const [confId, conf] of Object.entries(confirmWindows)) {
     if (conf.windowId === windowId) {
@@ -14,24 +15,38 @@ chrome.windows.onRemoved.addListener((windowId) => {
   }
 });
 
+// ─── Native Host Connection ──────────────────────────────────────
 function tryConnectNative() {
   try {
     nativePort = chrome.runtime.connectNative('com.zenith.passkeys');
+
     nativePort.onMessage.addListener(handleNativeMessage);
+
     nativePort.onDisconnect.addListener(() => {
       nativePort = null;
       if (chrome.runtime.lastError) {
         console.log('Native host disconnected:', chrome.runtime.lastError.message);
       }
+      // Reject all pending requests
       for (const reqId in pendingRequests) {
         pendingRequests[reqId].reject(new Error('Native host disconnected'));
       }
       pendingRequests = {};
     });
+
     useFallback = false;
+    return true;
   } catch (e) {
     console.warn('Native host not available, using fallback:', e);
+    nativePort = null;
     useFallback = true;
+    return false;
+  }
+}
+
+function ensureConnected() {
+  if (!nativePort && !useFallback) {
+    tryConnectNative();
   }
 }
 
@@ -48,17 +63,24 @@ function sendToNative(action, data) {
     const requestId = Date.now() + Math.random();
     pendingRequests[requestId] = { resolve, reject };
     const msg = { requestId, action, ...data };
-    
-    if (!nativePort && !useFallback) {
-      tryConnectNative();
-    }
+
+    ensureConnected();
 
     if (nativePort) {
-      nativePort.postMessage(msg);
+      try {
+        nativePort.postMessage(msg);
+      } catch (e) {
+        delete pendingRequests[requestId];
+        reject(new Error('Failed to send message to native host'));
+        return;
+      }
     } else {
       delete pendingRequests[requestId];
       reject(new Error('Native host not connected'));
+      return;
     }
+
+    // Timeout after 30 seconds
     setTimeout(() => {
       if (pendingRequests[requestId]) {
         const rej = pendingRequests[requestId].reject;
@@ -69,20 +91,33 @@ function sendToNative(action, data) {
   });
 }
 
+// Initial connection attempt
 tryConnectNative();
 
+// ─── Message Router ──────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.action === 'webauthn_create' || msg.action === 'webauthn_get') {
+  const action = msg.action;
+
+  // WebAuthn requests
+  if (action === 'webauthn_create' || action === 'webauthn_get') {
     handleWebAuthnRequest(msg, sender)
       .then(result => sendResponse(result))
       .catch(err => sendResponse({ error: err.message }));
     return true;
   }
-  if (msg.action === 'get_status') {
-    sendResponse({ unlocked: nativePort !== null || useFallback, fallback: useFallback });
+
+  // Status check
+  if (action === 'get_status') {
+    sendResponse({
+      unlocked: nativePort !== null || useFallback,
+      fallback: useFallback,
+      connected: nativePort !== null,
+    });
     return true;
   }
-  if (msg.action === 'confirm_response') {
+
+  // Confirmation response from confirm.html popup
+  if (action === 'confirm_response') {
     const confId = msg.confirmId;
     if (confirmWindows[confId]) {
       confirmWindows[confId].resolve(msg.allowed);
@@ -91,22 +126,64 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     return true;
   }
-  if (['unlock', 'create_vault', 'list_credentials', 'lock', 'get_settings', 'update_settings'].includes(msg.action)) {
+
+  // Vault operations
+  const vaultActions = [
+    'vault_exists', 'is_unlocked', 'unlock', 'create_vault',
+    'list_credentials', 'lock', 'get_settings', 'update_settings',
+    'delete_credential',
+  ];
+
+  if (vaultActions.includes(action)) {
     if (useFallback) {
-      if (msg.action === 'create_vault') ZenithFallback.createVault(msg.password).then(res => sendResponse({recovery_key: res})).catch(e => sendResponse({error: e.message}));
-      else if (msg.action === 'unlock') ZenithFallback.unlockVault(msg.password).then(res => sendResponse({success: res})).catch(e => sendResponse({error: e.message}));
-      else if (msg.action === 'list_credentials') ZenithFallback.listCredentials().then(res => sendResponse({credentials: res})).catch(e => sendResponse({error: e.message}));
-      else if (msg.action === 'lock') ZenithFallback.lockVault().then(() => sendResponse({success: true})).catch(e => sendResponse({error: e.message}));
-      else sendResponse({error: 'Not supported in fallback'});
-    } else {
-      sendToNative(msg.action, msg)
+      handleFallbackAction(action, msg)
         .then(result => sendResponse(result))
-        .catch(err => sendResponse({error: err.message}));
+        .catch(e => sendResponse({ error: e.message }));
+    } else {
+      sendToNative(action, msg)
+        .then(result => sendResponse(result))
+        .catch(err => sendResponse({ error: err.message }));
     }
     return true;
   }
 });
 
+// ─── Fallback Action Handler ─────────────────────────────────────
+async function handleFallbackAction(action, msg) {
+  switch (action) {
+    case 'vault_exists': {
+      const data = await chrome.storage.local.get('zenith_vault');
+      return { exists: !!data.zenith_vault };
+    }
+    case 'is_unlocked':
+      return { unlocked: ZenithFallback._isUnlocked ? ZenithFallback._isUnlocked() : false };
+    case 'create_vault': {
+      const key = await ZenithFallback.createVault(msg.password);
+      return { recovery_key: key };
+    }
+    case 'unlock': {
+      const ok = await ZenithFallback.unlockVault(msg.password);
+      return { success: ok };
+    }
+    case 'list_credentials': {
+      const creds = await ZenithFallback.listCredentials();
+      return { credentials: creds };
+    }
+    case 'lock':
+      await ZenithFallback.lockVault();
+      return { success: true };
+    case 'delete_credential':
+      if (ZenithFallback.deleteCredential) {
+        await ZenithFallback.deleteCredential(msg.credentialId);
+        return { success: true };
+      }
+      return { error: 'Delete not supported in fallback mode' };
+    default:
+      return { error: 'Not supported in fallback mode' };
+  }
+}
+
+// ─── WebAuthn Request Handler ────────────────────────────────────
 async function handleWebAuthnRequest(msg, sender) {
   const action = msg.action === 'webauthn_create' ? 'create' : 'get';
   const origin = msg.origin || (sender.url ? new URL(sender.url).origin : '');
@@ -124,30 +201,37 @@ async function handleWebAuthnRequest(msg, sender) {
     }
   }
 
-  return sendToNative(msg.action === 'webauthn_create' ? 'create_credential' : 'get_assertion', {
-    options: msg.options,
-    origin,
-  });
+  return sendToNative(
+    msg.action === 'webauthn_create' ? 'create_credential' : 'get_assertion',
+    { options: msg.options, origin }
+  );
 }
 
+// ─── Confirmation Dialog ─────────────────────────────────────────
 async function showConfirmation(action, origin, options) {
   return new Promise((resolve) => {
     const confirmId = Date.now() + Math.random();
     confirmWindows[confirmId] = { resolve, action, origin, options };
 
     const width = 400;
-    const height = 300;
+    const height = 320;
 
     chrome.windows.create({
       url: chrome.runtime.getURL('confirm.html') + `?action=${action}&origin=${encodeURIComponent(origin)}&confirmId=${confirmId}`,
       type: 'popup',
       width,
       height,
-
     }, (window) => {
-      confirmWindows[confirmId].windowId = window.id;
+      if (window) {
+        confirmWindows[confirmId].windowId = window.id;
+      } else {
+        // Window creation failed — auto-deny
+        resolve(false);
+        delete confirmWindows[confirmId];
+      }
     });
 
+    // Timeout after 2 minutes
     setTimeout(() => {
       if (confirmWindows[confirmId]) {
         confirmWindows[confirmId].resolve(false);

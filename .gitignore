@@ -64,3 +64,17 @@ Thumbs.db
 /plan.md
 /audit_test.py
 /cli/tests/audit_test.py
+
+# Sensitive files — NEVER commit these
+vault.enc
+*.enc
+gdrive_token.json
+host_debug.log
+
+# Debug/temp scripts
+cli/fix_tests.py
+cli/test_debug.py
+cli/test_host.py
+
+# Native host manifests (generated per-machine)
+native-manifests/

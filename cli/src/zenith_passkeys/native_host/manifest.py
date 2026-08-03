@@ -4,7 +4,18 @@ import shutil
 import sys
 from pathlib import Path
 
-EXTENSION_ID = "chrome-extension://zenithpasskeysplaceholder/"  # placeholder
+# ──────────────────────────────────────────────────────────────────
+# IMPORTANT: Update EXTENSION_ID with your actual Chrome/Edge
+# extension ID after loading the unpacked extension.
+#
+# To find your extension ID:
+#   1. Go to chrome://extensions (or edge://extensions)
+#   2. Find "Zenith Passkeys"
+#   3. Copy the ID shown under the extension name
+#   4. Replace the placeholder below with:
+#      "chrome-extension://YOUR_ACTUAL_ID/"
+# ──────────────────────────────────────────────────────────────────
+EXTENSION_ID = "chrome-extension://zenithpasskeysplaceholder/"
 EXTENSION_ID_FIREFOX = "zenith-passkeys@zenith.dev"
 
 def get_host_path() -> str:

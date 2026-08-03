@@ -8,70 +8,98 @@
 </head>
 <body>
   <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-brand">
+        <img src="../icons/icon-48.png" alt="Zenith" class="header-logo" width="24" height="24">
+        <span class="header-title">Zenith Passkeys</span>
+      </div>
+      <span class="header-version">v1.0</span>
+    </div>
+
     <!-- First-run view -->
     <div id="view-firstrun" class="view hidden">
       <h2>Create Vault</h2>
-      <input type="password" id="fr-password" placeholder="Master password" />
+      <p class="view-desc">Set a master password to encrypt your passkeys locally.</p>
+      <input type="password" id="fr-password" placeholder="Master password (8+ characters)" />
+      <div class="strength-bar"><div id="fr-strength-fill" class="strength-fill"></div></div>
+      <span id="fr-strength-label" class="strength-label"></span>
       <input type="password" id="fr-confirm" placeholder="Confirm password" />
-      <button id="fr-create">Create Vault</button>
+      <div id="fr-error" class="inline-error hidden"></div>
+      <button id="fr-create" data-loading-text="Creating vault...">Create Vault</button>
       <div id="fr-recovery" class="hidden">
-        <p class="warning">SAVE THIS RECOVERY KEY</p>
-        <pre id="fr-recovery-key"></pre>
-        <label><input type="checkbox" id="fr-checkbox" /> I have saved this key</label>
-        <button id="fr-continue" disabled>Continue</button>
+        <div class="recovery-card">
+          <p class="warning">⚠️ SAVE THIS RECOVERY KEY</p>
+          <p class="recovery-hint">If you lose your password, this is the only way to recover your passkeys.</p>
+          <pre id="fr-recovery-key"></pre>
+          <label class="checkbox-label"><input type="checkbox" id="fr-checkbox" /> I have saved this key safely</label>
+          <button id="fr-continue" disabled>Continue</button>
+        </div>
       </div>
     </div>
 
     <!-- Unlock view -->
     <div id="view-unlock" class="view hidden">
+      <div class="unlock-icon">🔒</div>
       <h2>Unlock Vault</h2>
-      <input type="password" id="ul-password" placeholder="Master password" />
-      <button id="ul-unlock">Unlock</button>
-      <a id="ul-recovery" href="#">Use Recovery Key</a>
+      <input type="password" id="ul-password" placeholder="Master password" autofocus />
+      <div id="ul-error" class="inline-error hidden"></div>
+      <button id="ul-unlock" data-loading-text="Unlocking...">Unlock</button>
+      <a id="ul-recovery" href="#">Forgot password? Use Recovery Key</a>
     </div>
 
     <!-- Main view -->
     <div id="view-main" class="view hidden">
       <div class="tabs">
-        <button class="tab active" data-tab="credentials">Credentials</button>
+        <button class="tab active" data-tab="credentials">Passkeys <span id="cred-count" class="badge">0</span></button>
         <button class="tab" data-tab="settings">Settings</button>
       </div>
 
       <div id="tab-credentials" class="tab-content">
-        <input type="text" id="cred-search" placeholder="Search by domain..." />
+        <div class="search-wrapper">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="cred-search" placeholder="Search passkeys..." />
+        </div>
         <div id="cred-list"></div>
       </div>
 
       <div id="tab-settings" class="tab-content hidden">
         <div class="setting-row">
-          <label>Idle timeout (min)</label>
+          <label>Auto-lock timeout</label>
           <select id="set-timeout">
-            <option value="5">5</option>
-            <option value="15" selected>15</option>
-            <option value="30">30</option>
-            <option value="60">60</option>
+            <option value="5">5 min</option>
+            <option value="15" selected>15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
           </select>
         </div>
         <div class="setting-row">
           <label>Native host</label>
-          <span id="set-host-status">Checking...</span>
+          <span id="set-host-status" class="status-badge">Checking...</span>
         </div>
-        <button id="set-lock" class="btn-secondary">Lock Now</button>
+        <div class="settings-divider"></div>
+        <button id="set-lock" class="btn-secondary btn-lock">🔒 Lock Vault</button>
       </div>
     </div>
 
     <!-- Fallback banner -->
     <div id="fallback-banner" class="hidden">
-      ⚠️ Running without backup sync. Install zenith-passkeys CLI for full backup support.
+      ⚠️ Browser-only mode — install the <strong>zenith-passkeys</strong> CLI for full backup & sync support.
     </div>
+
     <!-- Error view -->
-    <div id="view-error" class="view hidden" style="text-align: center; padding: 10px 0;">
-      <h2 style="color: var(--danger);">⚠️ Error Occurred</h2>
-      <p style="font-size: 14px; margin-bottom: 12px;">We are sorry for the issue. Please provide this error code for assistance:</p>
+    <div id="view-error" class="view hidden" style="text-align: center; padding: 20px 0;">
+      <div class="error-icon">⚠️</div>
+      <h2 style="color: var(--danger);">Something went wrong</h2>
+      <p style="font-size: 13px; margin-bottom: 12px; color: var(--text-muted);">Please share this error code for support:</p>
       <input type="text" id="error-code-input" readonly style="font-family: monospace; font-size: 12px; color: var(--danger); border-color: var(--danger); text-align: center; margin-bottom: 12px;" />
       <button id="error-copy-btn" class="btn-secondary">Copy Error Code</button>
     </div>
   </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
   <script src="popup.js"></script>
 </body>
 </html>

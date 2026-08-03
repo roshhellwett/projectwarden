@@ -246,5 +246,17 @@ const ZenithFallback = (() => {
     };
   }
 
-  return { handleCreate, handleGet, createVault, unlockVault, listCredentials, lockVault };
+  function _isUnlocked() {
+    return unlockedVault !== null;
+  }
+
+  async function deleteCredential(credentialId) {
+    const vault = await getVault();
+    const idx = vault.credentials.findIndex(c => c.credential_id === credentialId);
+    if (idx === -1) throw new Error('Credential not found');
+    vault.credentials.splice(idx, 1);
+    await saveVault(vault);
+  }
+
+  return { handleCreate, handleGet, createVault, unlockVault, listCredentials, lockVault, _isUnlocked, deleteCredential };
 })();

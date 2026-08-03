@@ -73,7 +73,7 @@ class VaultManager:
                 f.write(header.to_bytes() + payload_ct)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp, self.vault_path)
+            os.replace(str(tmp), str(self.vault_path))
 
         return display_recovery, mek
 
@@ -181,4 +181,4 @@ class VaultManager:
                 f.write(header.to_bytes() + payload_ct)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp, self.vault_path)
+            os.replace(str(tmp), str(self.vault_path))

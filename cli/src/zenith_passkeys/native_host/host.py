@@ -2,7 +2,7 @@ import time
 import gc
 from ..core.vault import VaultManager
 from ..core.schema import VaultPayload
-from ..core.credentials import add_credential, find_credentials, update_counter
+from ..core.credentials import add_credential, find_credentials, update_counter, delete_credential
 from ..core.webauthn import create_credential_response, get_assertion_response, base64url_decode
 from .protocol import read_message, send_message
 
@@ -60,6 +60,7 @@ class NativeHost:
                 "list_credentials": self._list_credentials,
                 "get_settings": self._get_settings,
                 "update_settings": self._update_settings,
+                "delete_credential": self._delete_credential,
             }.get(action)
             if not handler:
                 return {"error": f"Unknown action: {action}"}
@@ -104,6 +105,8 @@ class NativeHost:
             return {"error": "Vault is locked"}
         options = msg.get("options", {})
         origin = msg.get("origin", "")
+        if not origin:
+            return {"error": "Missing origin"}
         rp_id = options.get("rp", {}).get("id", "")
         if not self._validate_rp_id(rp_id, origin):
             return {"error": f"Security Error: Invalid rpId {rp_id} for origin {origin}"}
@@ -123,6 +126,8 @@ class NativeHost:
             return {"error": "Vault is locked"}
         options = msg.get("options", {})
         origin = msg.get("origin", "")
+        if not origin:
+            return {"error": "Missing origin"}
         rp_id = options.get("rpId", "")
         if not self._validate_rp_id(rp_id, origin):
             return {"error": f"Security Error: Invalid rpId {rp_id} for origin {origin}"}
@@ -156,6 +161,20 @@ class NativeHost:
              "createdAt": c.created_at, "lastUsedAt": c.last_used_at}
             for c in creds
         ]}
+
+    def _delete_credential(self, msg):
+        if not self.mek:
+            return {"error": "Vault is locked"}
+        credential_id = msg.get("credentialId", "")
+        if not credential_id:
+            return {"error": "Missing credentialId"}
+        try:
+            def updater(p):
+                return delete_credential(p, credential_id)
+            self.payload = self.vault.update(updater, self.mek)
+            return {"success": True}
+        except ValueError as e:
+            return {"error": str(e)}
 
     def _get_settings(self, msg):
         if not self.mek:

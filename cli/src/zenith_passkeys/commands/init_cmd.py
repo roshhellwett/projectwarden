@@ -3,7 +3,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from ..core.vault import VaultManager
-from ..core.crypto import VaultHeader, HEADER_SIZE_V1, HEADER_SIZE_V2, DEFAULT_KDF_ITERATIONS, DEFAULT_KDF_MEMORY, DEFAULT_KDF_LANES, derive_key, encrypt_aes_gcm
+from ..core.crypto import VaultHeader, HEADER_SIZE_V1, HEADER_SIZE_V2, DEFAULT_KDF_ITERATIONS, DEFAULT_KDF_MEMORY, DEFAULT_KDF_LANES, derive_key, encrypt_aes_gcm, decrypt_aes_gcm
 from ..core.recovery import parse_recovery_key
 from ..native_host.manifest import register_native_host
 from cryptography.exceptions import InvalidTag
@@ -71,7 +71,7 @@ def init(recover: bool):
                 f.write(header.to_bytes() + payload_ct)
                 f.flush()
                 os.fsync(f.fileno())
-            os.replace(tmp, vault.vault_path)
+            os.replace(str(tmp), str(vault.vault_path))
         console.print("[green]Vault recovered successfully.[/green]")
         register_native_host()
         return
