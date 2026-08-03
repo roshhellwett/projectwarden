@@ -173,7 +173,7 @@ class NativeHost:
         def updater(p):
             return update_counter(p, cred.credential_id, new_counter)
         self.payload = self.vault.update(updater, self.mek)
-        return {"assertion": response}
+        return {"credential": response}
 
     def _list_credentials(self, msg):
         if not self.mek:

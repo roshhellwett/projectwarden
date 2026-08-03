@@ -2,9 +2,11 @@ from .schema import VaultPayload, Credential
 from datetime import datetime, timezone
 
 def add_credential(payload: VaultPayload, cred: Credential) -> VaultPayload:
-    for existing in payload.credentials:
-        if existing.rp_id == cred.rp_id and existing.credential_id == cred.credential_id:
-            raise ValueError(f"Credential already exists for {cred.rp_id}")
+    # Remove existing credential with same rp_id and username to prevent duplicates
+    payload.credentials = [
+        c for c in payload.credentials 
+        if not (c.rp_id == cred.rp_id and c.username == cred.username)
+    ]
     if not cred.created_at:
         cred.created_at = datetime.now(timezone.utc).isoformat()
     payload.credentials.append(cred)

@@ -26,21 +26,37 @@
   }
 
   function serializeOptions(options) {
-    const raw = JSON.parse(JSON.stringify(options));
-    if (raw.publicKey) {
-      if (raw.publicKey.challenge) raw.publicKey.challenge = toBase64url(raw.publicKey.challenge);
-      if (raw.publicKey.user && raw.publicKey.user.id) raw.publicKey.user.id = toBase64url(raw.publicKey.user.id);
-      if (raw.publicKey.allowCredentials) {
-        raw.publicKey.allowCredentials.forEach(c => {
-          if (c.id) c.id = toBase64url(c.id);
-        });
-      }
-      if (raw.publicKey.excludeCredentials) {
-        raw.publicKey.excludeCredentials.forEach(c => {
-          if (c.id) c.id = toBase64url(c.id);
-        });
-      }
+    const pub = options.publicKey;
+    if (!pub) return options;
+    
+    // Convert ArrayBuffers to base64url strings BEFORE cloning so JSON stringify works
+    const serializedPub = { ...pub };
+    
+    if (!serializedPub.rpId) {
+      serializedPub.rpId = window.location.hostname;
     }
+    
+    if (pub.challenge) {
+      serializedPub.challenge = toBase64url(pub.challenge);
+    }
+    if (pub.user && pub.user.id) {
+      serializedPub.user = { ...pub.user, id: toBase64url(pub.user.id) };
+    }
+    if (pub.allowCredentials) {
+      serializedPub.allowCredentials = pub.allowCredentials.map(c => ({
+        ...c,
+        id: typeof c.id === 'string' ? c.id : (c.id ? toBase64url(c.id) : c.id)
+      }));
+    }
+    if (pub.excludeCredentials) {
+      serializedPub.excludeCredentials = pub.excludeCredentials.map(c => ({
+        ...c,
+        id: typeof c.id === 'string' ? c.id : (c.id ? toBase64url(c.id) : c.id)
+      }));
+    }
+    
+    const raw = JSON.parse(JSON.stringify(options));
+    raw.publicKey = serializedPub;
     return raw;
   }
 
@@ -49,6 +65,7 @@
       id: data.id,
       rawId: typeof data.rawId === 'string' ? fromBase64url(data.rawId) : data.rawId,
       type: data.type,
+      authenticatorAttachment: data.authenticatorAttachment || 'platform',
       getClientExtensionResults: () => ({}),
     };
     if (data.response) {
@@ -59,29 +76,29 @@
       if (data.response.clientDataJSON) {
         cred.response.clientDataJSON = fromBase64url(data.response.clientDataJSON);
       }
-      if (data.response.authenticatorData) {
-        cred.response.authenticatorData = fromBase64url(data.response.authenticatorData);
-      }
+      
+      const authData = data.response.authenticatorData ? fromBase64url(data.response.authenticatorData) : new ArrayBuffer(0);
+      const pubKeyDer = data.response.publicKeyDer ? fromBase64url(data.response.publicKeyDer) : new ArrayBuffer(0);
+      
       if (data.response.signature) {
         cred.response.signature = fromBase64url(data.response.signature);
       }
       if (data.response.userHandle) {
         cred.response.userHandle = fromBase64url(data.response.userHandle);
       }
-      if (data.response.publicKeyDer) {
-        cred.response.publicKeyDer = fromBase64url(data.response.publicKeyDer);
-      }
+      
       cred.response.getTransports = () => ['internal'];
-      cred.response.getAuthenticatorData = () => {
-        if (cred.response.authenticatorData) return cred.response.authenticatorData;
-        return new ArrayBuffer(0);
-      };
-      cred.response.getPublicKey = () => {
-        if (cred.response.publicKeyDer) return cred.response.publicKeyDer;
-        return new ArrayBuffer(0);
-      };
+      cred.response.getAuthenticatorData = () => authData;
+      cred.response.getPublicKey = () => pubKeyDer;
       cred.response.getPublicKeyAlgorithm = () => -7;
+      
+      if (data.response.attestationObject) {
+        Object.setPrototypeOf(cred.response, AuthenticatorAttestationResponse.prototype);
+      } else {
+        Object.setPrototypeOf(cred.response, AuthenticatorAssertionResponse.prototype);
+      }
     }
+    Object.setPrototypeOf(cred, PublicKeyCredential.prototype);
     return cred;
   }
 

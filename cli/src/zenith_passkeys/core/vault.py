@@ -84,10 +84,19 @@ class VaultManager:
         header = VaultHeader.from_bytes(raw)
         dk = derive_key(password.encode(), header.pw_salt, header.kdf_iterations, header.kdf_memory, header.kdf_lanes)
         aad = header.aad() if header.version >= 2 else None
-        mek_bytes = decrypt_aes_gcm(header.pw_wrapped_mek, dk, header.pw_wrapped_nonce, aad)
+        
+        from cryptography.exceptions import InvalidTag
+        try:
+            mek_bytes = decrypt_aes_gcm(header.pw_wrapped_mek, dk, header.pw_wrapped_nonce, aad)
+        except InvalidTag:
+            raise ValueError("Invalid master password or corrupted vault")
+            
         mek = bytearray(mek_bytes)
         payload_ct = raw[header.size():]
-        payload_json = decrypt_aes_gcm(payload_ct, mek_bytes, header.payload_nonce, aad)
+        try:
+            payload_json = decrypt_aes_gcm(payload_ct, mek_bytes, header.payload_nonce, aad)
+        except InvalidTag:
+            raise ValueError("Vault payload is corrupted")
         return VaultPayload.from_json(payload_json), mek
 
     def unlock_with_recovery(self, recovery_key_raw: bytes) -> tuple[VaultPayload, bytearray]:
