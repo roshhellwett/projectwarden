@@ -36,7 +36,11 @@ def generate_credential_keypair() -> tuple[bytes, bytes, bytes]:
     }
     cose_bytes = cbor2.dumps(cose_key)
     credential_id = os.urandom(32)
-    return private_bytes, cose_bytes, credential_id
+    spki_bytes = private_key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return private_bytes, cose_bytes, credential_id, spki_bytes
 
 def build_authenticator_data(rp_id: str, flags: int, counter: int,
                               attested_cred_data: bytes | None = None) -> bytes:
@@ -51,7 +55,7 @@ def build_attested_credential_data(credential_id: bytes, cose_public_key: bytes)
 
 def create_credential_response(rp_id: str, origin: str, challenge_b64url: str,
                                  user_handle: bytes, username: str) -> tuple[dict, Credential]:
-    private_bytes, cose_bytes, credential_id = generate_credential_keypair()
+    private_bytes, cose_bytes, credential_id, spki_bytes = generate_credential_keypair()
     attested = build_attested_credential_data(credential_id, cose_bytes)
     auth_data = build_authenticator_data(rp_id, 0x45, 0, attested)
     attestation_object = cbor2.dumps({
@@ -73,6 +77,8 @@ def create_credential_response(rp_id: str, origin: str, challenge_b64url: str,
         "response": {
             "attestationObject": base64url_encode(attestation_object),
             "clientDataJSON": base64url_encode(client_data_json),
+            "authenticatorData": base64url_encode(auth_data),
+            "publicKeyDer": base64url_encode(spki_bytes),
         },
         "authenticatorAttachment": "platform",
     }

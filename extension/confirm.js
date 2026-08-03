@@ -17,6 +17,9 @@ function deny() {
   window.close();
 }
 
+document.getElementById('btn-allow').addEventListener('click', allow);
+document.getElementById('btn-deny').addEventListener('click', deny);
+
 function showError(msg, code) {
   document.querySelector('.icon').style.display = 'none';
   document.querySelector('h2').style.display = 'none';

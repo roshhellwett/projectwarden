@@ -63,12 +63,38 @@ class NativeHost:
                 "delete_credential": self._delete_credential,
             }.get(action)
             if not handler:
-                return {"error": f"Unknown action: {action}"}
-            return handler(msg)
+                resp = {"error": f"Unknown action: {action}"}
+            else:
+                resp = handler(msg)
+                
+            if self.mek and self.payload and action in ["unlock", "create_credential", "get_assertion", "delete_credential"]:
+                status = "error" if "error" in resp else "success"
+                details = resp.get("error", "Action successful")
+                if status == "error" and isinstance(details, dict):
+                    details = str(details)
+                self._log_action(action, status, details)
+                
+            return resp
         except Exception as e:
             import base64
             error_code = base64.b64encode(str(e).encode("utf-8")).decode("utf-8")
+            if self.mek and self.payload:
+                self._log_action(action, "error", str(e))
             return {"error": str(e), "errorCode": error_code}
+
+    def _log_action(self, action: str, status: str, details: str) -> None:
+        if not self.mek or not self.payload:
+            return
+        def updater(p):
+            from ..core.schema import LogEntry
+            p.action_log.append(LogEntry(time.time(), action, status, details))
+            if len(p.action_log) > 100:
+                p.action_log = p.action_log[-100:]
+            return p
+        try:
+            self.payload = self.vault.update(updater, self.mek)
+        except Exception:
+            pass
 
     def _ping(self, msg): return {"status": "ok", "version": "1.0.0"}
     def _vault_exists(self, msg): return {"exists": self.vault.exists()}

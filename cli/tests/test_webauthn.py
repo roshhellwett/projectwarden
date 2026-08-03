@@ -14,7 +14,7 @@ def test_base64url_roundtrip():
     assert decoded == data
 
 def test_generate_keypair():
-    priv, cose, cred_id = generate_credential_keypair()
+    priv, cose, cred_id, spki = generate_credential_keypair()
     assert len(priv) > 0
     assert len(cose) > 0
     assert len(cred_id) == 32

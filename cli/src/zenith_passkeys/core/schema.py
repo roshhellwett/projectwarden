@@ -30,10 +30,18 @@ class Settings:
             raise ValueError("use_keyring must be a boolean")
 
 @dataclass
+class LogEntry:
+    timestamp: float
+    action: str
+    status: str
+    details: str
+
+@dataclass
 class VaultPayload:
     version: int = 1
     credentials: list[Credential] = field(default_factory=list)
     settings: Settings = field(default_factory=Settings)
+    action_log: list[LogEntry] = field(default_factory=list)
 
     def to_json(self) -> bytes:
         d = asdict(self)
@@ -45,4 +53,5 @@ class VaultPayload:
         creds = [Credential(**c) for c in d.get("credentials", [])]
         settings = Settings(**d.get("settings", {}))
         settings.validate()
-        return cls(version=d.get("version", 1), credentials=creds, settings=settings)
+        logs = [LogEntry(**l) for l in d.get("action_log", [])]
+        return cls(version=d.get("version", 1), credentials=creds, settings=settings, action_log=logs)

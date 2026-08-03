@@ -68,6 +68,19 @@
       if (data.response.userHandle) {
         cred.response.userHandle = fromBase64url(data.response.userHandle);
       }
+      if (data.response.publicKeyDer) {
+        cred.response.publicKeyDer = fromBase64url(data.response.publicKeyDer);
+      }
+      cred.response.getTransports = () => ['internal'];
+      cred.response.getAuthenticatorData = () => {
+        if (cred.response.authenticatorData) return cred.response.authenticatorData;
+        return new ArrayBuffer(0);
+      };
+      cred.response.getPublicKey = () => {
+        if (cred.response.publicKeyDer) return cred.response.publicKeyDer;
+        return new ArrayBuffer(0);
+      };
+      cred.response.getPublicKeyAlgorithm = () => -7;
     }
     return cred;
   }

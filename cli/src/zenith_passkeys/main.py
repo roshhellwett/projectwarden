@@ -4,7 +4,7 @@ import base64
 import sys
 from rich.console import Console
 from rich.panel import Panel
-from .commands import init_cmd, list_cmd, export_cmd, import_cmd, backup_cmd, audit_cmd, lock_cmd, config_cmd, change_password_cmd, delete_cmd
+from .commands import init_cmd, list_cmd, export_cmd, import_cmd, backup_cmd, audit_cmd, lock_cmd, config_cmd, change_password_cmd, delete_cmd, logs_cmd
 
 class ErrorHandlingGroup(click.Group):
     def invoke(self, ctx):
@@ -46,4 +46,4 @@ cli.add_command(lock_cmd.lock)
 cli.add_command(config_cmd.config)
 cli.add_command(change_password_cmd.change_password)
 cli.add_command(delete_cmd.delete)
-
+cli.add_command(logs_cmd.logs)

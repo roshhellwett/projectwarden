@@ -9,7 +9,7 @@ from pathlib import Path
 # When you publish to the Chrome Web Store, you will get a permanent
 # ID. Hardcode it here so your end-users never have to configure it!
 # ──────────────────────────────────────────────────────────────────
-EXTENSION_ID = "chrome-extension://mdpajbajbaemmgajbdjdfiflhcngplpf/"
+EXTENSION_ID = "chrome-extension://obmjfdinhjjnajapcpkdjignghpjhalm/"
 EXTENSION_ID_FIREFOX = "zenith-passkeys@zenith.dev"
 
 def get_host_path() -> str:
