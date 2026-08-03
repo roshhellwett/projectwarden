@@ -50,7 +50,7 @@ def get_chrome_manifest_dir() -> Path:
     elif sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Google" / "Chrome" / "NativeMessagingHosts"
     else:
-        return Path(os.environ.get("LOCALAPPDATA", "")) / "zenith-passkeys" / "native-manifests"
+        return Path(os.environ.get("LOCALAPPDATA", "")) / "zenith-passkeys" / "native-manifests" / "chrome"
 
 def get_edge_manifest_dir() -> Path:
     if sys.platform == "linux":
@@ -58,7 +58,7 @@ def get_edge_manifest_dir() -> Path:
     elif sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Microsoft Edge" / "NativeMessagingHosts"
     else:
-        return Path(os.environ.get("LOCALAPPDATA", "")) / "zenith-passkeys" / "native-manifests"
+        return Path(os.environ.get("LOCALAPPDATA", "")) / "zenith-passkeys" / "native-manifests" / "edge"
 
 def get_firefox_manifest_dir() -> Path:
     if sys.platform == "linux":
@@ -66,7 +66,7 @@ def get_firefox_manifest_dir() -> Path:
     elif sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts"
     else:
-        return Path(os.environ.get("LOCALAPPDATA", "")) / "zenith-passkeys" / "native-manifests"
+        return Path(os.environ.get("LOCALAPPDATA", "")) / "zenith-passkeys" / "native-manifests" / "firefox"
 
 def register_native_host() -> None:
     host_path = get_host_path()
