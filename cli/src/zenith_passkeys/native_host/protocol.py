@@ -1,6 +1,6 @@
-import sys
-import struct
 import json
+import struct
+import sys
 
 MAX_MESSAGE_SIZE = 1024 * 1024
 
@@ -10,7 +10,7 @@ if sys.platform == "win32":
     try:
         msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
         msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - stdio mode switch is best-effort
         pass
 
 def read_message() -> dict | None:

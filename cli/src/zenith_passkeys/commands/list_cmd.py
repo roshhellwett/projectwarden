@@ -1,14 +1,17 @@
 import json
-import click
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from ..core.vault import VaultManager
-from cryptography.exceptions import InvalidTag
 from datetime import datetime, timezone
+
+import click
+from cryptography.exceptions import InvalidTag
+from rich.console import Console
 from rich.markup import escape
+from rich.table import Table
+
+from ..core.vault import VaultManager
+from ._shared import handle_vault_error, require_vault
 
 console = Console()
+
 
 @click.command()
 @click.option("--json-output", "json_flag", is_flag=True, help="Output as JSON")
@@ -17,16 +20,13 @@ console = Console()
 def list_credentials(json_flag: bool, domain: str | None, unused_days: int | None):
     """List stored credentials."""
     vault = VaultManager()
-    if not vault.exists():
-        console.print("[red]No vault found. Run 'zenith-passkeys init' first.[/red]")
-        raise SystemExit(1)
+    require_vault(vault)
 
-    password = click.prompt("Master password", hide_input=True)
+    from ._shared import unlock_vault
     try:
-        payload, _ = vault.unlock(password)
-    except InvalidTag:
-        console.print("[red]Wrong password.[/red]")
-        raise SystemExit(1)
+        (payload, _), _pw = unlock_vault(vault)
+    except (InvalidTag, ValueError) as e:
+        handle_vault_error(e)
 
     creds = payload.credentials
     if domain:

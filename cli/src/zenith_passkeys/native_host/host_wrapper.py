@@ -1,8 +1,8 @@
 """
-Wrapper script for the native messaging host.
-Provides debug logging when ZENITH_DEBUG environment variable is set.
+Wrapper entry for the native messaging host (installed on PATH as
+zenith-passkeys-host via pyproject console script — this module is the
+function behind it). Provides debug logging when ZENITH_DEBUG is set.
 """
-import sys
 import os
 import traceback
 
@@ -13,7 +13,7 @@ def get_log_path():
         from platformdirs import user_config_dir
         config_dir = user_config_dir("zenith-passkeys", ensure_exists=True)
         return os.path.join(config_dir, "host_debug.log")
-    except Exception:
+    except Exception:  # noqa: BLE001 - logging must never crash the host
         return None
 
 
@@ -26,7 +26,7 @@ def log(msg):
         try:
             with open(log_path, "a") as f:
                 f.write(msg + "\n")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - debug logging must never crash the host
             pass
 
 
@@ -36,5 +36,5 @@ try:
     host = NativeHost()
     log("Host initialized.")
     host.run()
-except Exception as e:
+except Exception:  # noqa: BLE001 - log and exit silently (stdio protocol)
     log("Fatal exception:\n" + traceback.format_exc())

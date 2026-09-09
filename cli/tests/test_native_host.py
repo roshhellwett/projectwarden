@@ -13,7 +13,7 @@ def test_host_ping():
     host = NativeHost()
     resp = host._ping({})
     assert resp["status"] == "ok"
-    assert resp["version"] == "1.0.0"
+    assert resp["version"] == "1.1.2"
 
 @patch("zenith_passkeys.core.vault.VaultManager.exists", return_value=False)
 def test_host_no_vault(mock_exists):
@@ -34,3 +34,17 @@ def test_host_lock():
 
 def test_max_message_size():
     assert MAX_MESSAGE_SIZE == 1024 * 1024
+
+def test_host_rp_id_psl_validation():
+    host = NativeHost()
+    # Standard domain
+    assert host._validate_rp_id("github.com", "https://github.com")
+    assert host._validate_rp_id("github.com", "https://sub.github.com")
+
+    # Public suffix rejection (anti-spoofing)
+    assert not host._validate_rp_id("github.io", "https://evil.github.io")
+    assert not host._validate_rp_id("pages.dev", "https://site.pages.dev")
+    assert not host._validate_rp_id("com", "https://example.com")
+
+    # Valid tenant subdomains
+    assert host._validate_rp_id("evil.github.io", "https://evil.github.io")

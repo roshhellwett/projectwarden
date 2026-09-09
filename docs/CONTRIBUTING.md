@@ -42,7 +42,7 @@ projectwarden/
 │   ├── content-main.js           # WebAuthn interception (MAIN world)
 │   ├── content-isolated.js       # Message relay (ISOLATED world)
 │   ├── fallback-vault.js         # Browser-only vault mode
-│   ├── native-client.js          # Native messaging client
+│   ├── background.js             # Service worker: native messaging + routing
 │   ├── confirm.html/js           # WebAuthn confirmation dialog
 │   └── popup/                    # Extension popup UI
 └── docs/                         # Documentation

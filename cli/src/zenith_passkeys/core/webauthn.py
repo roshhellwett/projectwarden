@@ -1,11 +1,13 @@
-import os
-import json
-import hashlib
-import struct
 import base64
+import hashlib
+import json
+import os
+import struct
+
 import cbor2
-from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
 from .schema import Credential
 
 AAGUID = b"\x00" * 16
@@ -17,7 +19,8 @@ def base64url_decode(s: str) -> bytes:
     s += "=" * (4 - len(s) % 4)
     return base64.urlsafe_b64decode(s)
 
-def generate_credential_keypair() -> tuple[bytes, bytes, bytes]:
+def generate_credential_keypair() -> tuple[bytes, bytes, bytes, bytes]:
+    """Returns (pkcs8_private_bytes, cose_public_key_bytes, credential_id, spki_public_bytes)."""
     private_key = ec.generate_private_key(ec.SECP256R1())
     private_bytes = private_key.private_bytes(
         serialization.Encoding.DER,
@@ -54,10 +57,10 @@ def build_attested_credential_data(credential_id: bytes, cose_public_key: bytes)
     return AAGUID + struct.pack(">H", len(credential_id)) + credential_id + cose_public_key
 
 def create_credential_response(rp_id: str, origin: str, challenge_b64url: str,
-                                 user_handle: bytes, username: str) -> tuple[dict, Credential]:
+                               user_handle: bytes, username: str, uv: bool = True) -> tuple[dict, Credential]:
     private_bytes, cose_bytes, credential_id, spki_bytes = generate_credential_keypair()
     attested = build_attested_credential_data(credential_id, cose_bytes)
-    auth_data = build_authenticator_data(rp_id, 0x45, 0, attested)
+    auth_data = build_authenticator_data(rp_id, (0x45 if uv else 0x45 & ~0x04), 0, attested)
     attestation_object = cbor2.dumps({
         "fmt": "none",
         "attStmt": {},
@@ -95,12 +98,12 @@ def create_credential_response(rp_id: str, origin: str, challenge_b64url: str,
     return response, cred
 
 def get_assertion_response(credential: Credential, rp_id: str, origin: str,
-                              challenge_b64url: str) -> tuple[dict, int]:
+                            challenge_b64url: str, uv: bool = True) -> tuple[dict, int]:
     private_key_bytes = bytearray(base64url_decode(credential.private_key))
     private_key = serialization.load_der_private_key(bytes(private_key_bytes), password=None)
     private_key_bytes[:] = b'\x00' * len(private_key_bytes)
     new_counter = credential.counter + 1
-    auth_data = build_authenticator_data(rp_id, 0x05, new_counter)
+    auth_data = build_authenticator_data(rp_id, (0x05 if uv else 0x05 & ~0x04), new_counter)
     client_data = {
         "type": "webauthn.get",
         "challenge": challenge_b64url,

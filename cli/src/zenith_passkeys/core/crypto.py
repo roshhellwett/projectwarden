@@ -1,8 +1,8 @@
-import os
 import struct
 from dataclasses import dataclass
-from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
 MAGIC = b"ZNTH"
 HEADER_SIZE_V1 = 166
@@ -112,8 +112,8 @@ def derive_key(password: bytes, salt: bytes, iterations: int, memory: int, lanes
     kdf = Argon2id(salt=salt, length=32, iterations=iterations, memory_cost=memory, lanes=lanes)
     return kdf.derive(password)
 
-def encrypt_aes_gcm(plaintext: bytes, key: bytes, nonce: bytes, aad: bytes = None) -> bytes:
+def encrypt_aes_gcm(plaintext: bytes, key: bytes, nonce: bytes, aad: bytes | None = None) -> bytes:
     return AESGCM(key).encrypt(nonce, plaintext, aad)
 
-def decrypt_aes_gcm(ciphertext: bytes, key: bytes, nonce: bytes, aad: bytes = None) -> bytes:
+def decrypt_aes_gcm(ciphertext: bytes, key: bytes, nonce: bytes, aad: bytes | None = None) -> bytes:
     return AESGCM(key).decrypt(nonce, ciphertext, aad)

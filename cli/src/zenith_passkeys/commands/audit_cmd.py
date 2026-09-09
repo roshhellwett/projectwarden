@@ -1,38 +1,42 @@
 import json
-import socket
 from datetime import datetime, timezone
+
 import click
-from rich.console import Console
-from rich.table import Table
-from rich.markup import escape
-from ..core.vault import VaultManager
 from cryptography.exceptions import InvalidTag
+from rich.console import Console
+from rich.markup import escape
+from rich.table import Table
+
+from ..core.vault import VaultManager
+from ._shared import handle_vault_error, require_vault
 
 console = Console()
 
+
 @click.command()
 @click.option("--unused-days", default=90, type=int, help="Days of inactivity threshold")
+@click.option("--dns", is_flag=True, help="Also check domain DNS resolution (makes network requests)")
 @click.option("--json-output", "json_flag", is_flag=True, help="Output as JSON")
-def audit(unused_days: int, json_flag: bool):
-    """Audit vault for security issues."""
+def audit(unused_days: int, dns: bool, json_flag: bool):
+    """Audit vault for security issues (offline by default)."""
     vault = VaultManager()
-    if not vault.exists():
-        console.print("[red]No vault found. Run 'zenith-passkeys init' first.[/red]")
-        raise SystemExit(1)
+    require_vault(vault)
 
-    password = click.prompt("Master password", hide_input=True)
+    from ._shared import unlock_vault
     try:
-        payload, _ = vault.unlock(password)
-    except InvalidTag:
-        console.print("[red]Wrong password.[/red]")
-        raise SystemExit(1)
+        (payload, _), _pw = unlock_vault(vault)
+    except (InvalidTag, ValueError) as e:
+        handle_vault_error(e)
 
     issues = []
     now = datetime.now(timezone.utc)
 
     for c in payload.credentials:
         if c.last_used_at:
-            last = datetime.fromisoformat(c.last_used_at)
+            try:
+                last = datetime.fromisoformat(c.last_used_at)
+            except ValueError:
+                continue
             if (now - last).days >= unused_days:
                 issues.append({
                     "type": "stale",
@@ -55,18 +59,21 @@ def audit(unused_days: int, json_flag: bool):
             })
         seen[key] = True
 
-    domains = set(c.rp_id for c in payload.credentials)
-    for domain in domains:
-        try:
-            socket.getaddrinfo(domain, 443, socket.AF_INET, socket.SOCK_STREAM)
-        except socket.gaierror:
-            issues.append({
-                "type": "unresolvable",
-                "severity": "high",
-                "rp_id": domain,
-                "username": "",
-                "detail": f"Cannot resolve {domain}",
-            })
+    # DNS resolution is OPT-IN: it sends every stored domain to the system
+    # resolver, which leaks the user's site list. Default is offline.
+    if dns:
+        import socket
+        for domain in {c.rp_id for c in payload.credentials}:
+            try:
+                socket.getaddrinfo(domain, 443, socket.AF_INET, socket.SOCK_STREAM)
+            except socket.gaierror:
+                issues.append({
+                    "type": "unresolvable",
+                    "severity": "high",
+                    "rp_id": domain,
+                    "username": "",
+                    "detail": f"Cannot resolve {domain}",
+                })
 
     if json_flag:
         console.print_json(json.dumps(issues, indent=2))

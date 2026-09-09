@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field, asdict
-from typing import Optional
 import json
+from dataclasses import asdict, dataclass, field
+
 
 @dataclass
 class Credential:
@@ -12,13 +12,13 @@ class Credential:
     username: str
     counter: int = 0
     created_at: str = ""
-    last_used_at: Optional[str] = None
+    last_used_at: str | None = None
     algorithm: int = -7
 
 @dataclass
 class Settings:
     idle_timeout_minutes: int = 15
-    backup_provider: Optional[str] = None  # "gdrive" | None
+    backup_provider: str | None = None  # Legacy field retained for backward compatibility
     use_keyring: bool = False
 
     def validate(self):
@@ -27,7 +27,7 @@ class Settings:
         if self.backup_provider is not None and not isinstance(self.backup_provider, str):
             raise ValueError("backup_provider must be a string or None")
         if not isinstance(self.use_keyring, bool):
-            raise ValueError("use_keyring must be a boolean")
+            raise ValueError("use_keyring must be a boolean")  # noqa: TRY004 - payload validation
 
 @dataclass
 class LogEntry:
@@ -53,5 +53,5 @@ class VaultPayload:
         creds = [Credential(**c) for c in d.get("credentials", [])]
         settings = Settings(**d.get("settings", {}))
         settings.validate()
-        logs = [LogEntry(**l) for l in d.get("action_log", [])]
+        logs = [LogEntry(**entry) for entry in d.get("action_log", [])]
         return cls(version=d.get("version", 1), credentials=creds, settings=settings, action_log=logs)

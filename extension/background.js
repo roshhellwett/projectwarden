@@ -1,9 +1,12 @@
-importScripts('fallback-vault.js');
+importScripts('lib/cbor.js', 'fallback-vault.js');
+
+const SUPPORT_EMAIL = 'zenithprojects@icloud.com';
 
 let nativePort = null;
 let useFallback = false;
 let pendingRequests = {};
 let confirmWindows = {};
+let rpIndex = {};
 
 // ─── Window management for confirmation dialogs ──────────────────
 chrome.windows.onRemoved.addListener((windowId) => {
@@ -19,11 +22,16 @@ chrome.windows.onRemoved.addListener((windowId) => {
 function tryConnectNative() {
   try {
     nativePort = chrome.runtime.connectNative('com.zenith.passkeys');
+    if (!nativePort) {
+      useFallback = true;
+      return false;
+    }
 
     nativePort.onMessage.addListener(handleNativeMessage);
 
     nativePort.onDisconnect.addListener(() => {
       nativePort = null;
+      useFallback = true;
       if (chrome.runtime.lastError) {
         console.log('Native host disconnected:', chrome.runtime.lastError.message);
       }
@@ -60,7 +68,7 @@ function handleNativeMessage(msg) {
 
 function sendToNative(action, data) {
   return new Promise((resolve, reject) => {
-    const requestId = Date.now() + Math.random();
+    const requestId = crypto.randomUUID();
     pendingRequests[requestId] = { resolve, reject };
     const msg = { requestId, action, ...data };
 
@@ -102,18 +110,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (action === 'webauthn_create' || action === 'webauthn_get') {
     handleWebAuthnRequest(msg, sender)
       .then(result => sendResponse(result))
-      .catch(err => sendResponse({ error: err.message }));
+      .catch(err => sendResponse({ error: err.message, support: SUPPORT_EMAIL }));
     return true;
   }
 
-  // Status check
+  // Query candidate credentials for conditional autofill dropdown
+  if (action === 'webauthn_query_candidates') {
+    handleQueryCandidates(msg, sender)
+      .then(candidates => sendResponse({ candidates }))
+      .catch(() => sendResponse({ candidates: [] }));
+    return true;
+  }
+
+  // Status check: 'connected' means native host is reachable.
+  // 'unlocked' is only reliably known from is_unlocked; report false here
+  // so callers don't conflate "host is running" with "vault is open".
   if (action === 'get_status') {
     sendResponse({
-      unlocked: nativePort !== null || useFallback,
+      unlocked: false,  // callers should use 'is_unlocked' for real state
       fallback: useFallback,
-      connected: nativePort !== null,
+      connected: nativePort !== null && !useFallback,
+      support: SUPPORT_EMAIL,
     });
-    return true;
+    return false;
   }
 
   // Confirmation response from confirm.html popup
@@ -124,6 +143,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       chrome.windows.remove(confirmWindows[confId].windowId);
       delete confirmWindows[confId];
     }
+    return false;
+  }
+
+  if (action === 'open_dashboard') {
+    const url = chrome.runtime.getURL('dashboard/dashboard.html');
+    chrome.tabs.query({ url }, (tabs) => {
+      if (tabs && tabs.length > 0) {
+        chrome.tabs.update(tabs[0].id, { active: true });
+        chrome.windows.update(tabs[0].windowId, { focused: true });
+      } else {
+        chrome.tabs.create({ url });
+      }
+      sendResponse({ success: true });
+    });
     return true;
   }
 
@@ -131,24 +164,55 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   const vaultActions = [
     'vault_exists', 'is_unlocked', 'unlock', 'create_vault',
     'list_credentials', 'lock', 'get_settings', 'update_settings',
-    'delete_credential',
+    'delete_credential', 'recover_vault',
+    'change_password', 'get_audit_report', 'get_action_logs',
+    'get_backup_blob', 'restore_backup_blob', 'export_vault', 'import_vault',
+    'rotate_recovery_key',
   ];
 
   if (vaultActions.includes(action)) {
     if (useFallback) {
       handleFallbackAction(action, msg)
-        .then(result => sendResponse(result))
-        .catch(e => sendResponse({ error: e.message }));
+        .then(result => {
+          if (action === 'unlock' && result && result.success) {
+            ZenithFallback.listCredentials().then(creds => {
+              rpIndex = {};
+              for (const c of creds || []) {
+                if (!rpIndex[c.rpId]) rpIndex[c.rpId] = [];
+                rpIndex[c.rpId].push({ id: c.credentialId, username: c.username, rpId: c.rpId });
+              }
+            }).catch(() => {});
+          } else if (action === 'lock') {
+            rpIndex = {};
+          }
+          sendResponse(result);
+        })
+        .catch(e => sendResponse({ error: e.message, support: SUPPORT_EMAIL }));
     } else {
       sendToNative(action, msg)
-        .then(result => sendResponse(result))
-        .catch(err => sendResponse({ error: err.message }));
+        .then(result => {
+          if (action === 'unlock' && result && result.success) {
+            sendToNative('list_credentials', {}).then(listResp => {
+              if (listResp && listResp.credentials) {
+                rpIndex = {};
+                for (const c of listResp.credentials) {
+                  if (!rpIndex[c.rpId]) rpIndex[c.rpId] = [];
+                  rpIndex[c.rpId].push({ id: c.credentialId, username: c.username, rpId: c.rpId });
+                }
+              }
+            }).catch(() => {});
+          } else if (action === 'lock') {
+            rpIndex = {};
+          }
+          sendResponse(result);
+        })
+        .catch(err => sendResponse({ error: err.message, support: SUPPORT_EMAIL }));
     }
     return true;
   }
 });
 
-// ─── Fallback Action Handler ─────────────────────────────────────
+// ─── Fallback Action Handler ──────────────────────────────────────
 async function handleFallbackAction(action, msg) {
   switch (action) {
     case 'vault_exists': {
@@ -165,6 +229,15 @@ async function handleFallbackAction(action, msg) {
       const ok = await ZenithFallback.unlockVault(msg.password);
       return { success: ok };
     }
+    case 'recover_vault':
+      if (ZenithFallback.recoverVault) {
+        return ZenithFallback.recoverVault(msg.recoveryKey, msg.newPassword);
+      }
+      return { error: 'Recovery is not available in browser-only mode. Install the CLI: pip install -e ./cli, then run zenith-passkeys init --recover.', support: SUPPORT_EMAIL };
+    case 'get_settings':
+      return ZenithFallback.getSettings ? ZenithFallback.getSettings() : { settings: { idle_timeout_minutes: 15 } };
+    case 'update_settings':
+      return ZenithFallback.updateSettings ? ZenithFallback.updateSettings(msg.settings) : { success: true };
     case 'list_credentials': {
       const creds = await ZenithFallback.listCredentials();
       return { credentials: creds };
@@ -178,17 +251,120 @@ async function handleFallbackAction(action, msg) {
         return { success: true };
       }
       return { error: 'Delete not supported in fallback mode' };
+    case 'change_password':
+      return ZenithFallback.changePassword(msg.oldPassword, msg.newPassword);
+    case 'get_audit_report':
+      return ZenithFallback.getAuditReport(msg.unusedDays);
+    case 'get_action_logs':
+      return ZenithFallback.getActionLogs();
+    case 'get_backup_blob':
+      return ZenithFallback.getBackupBlob();
+    case 'restore_backup_blob':
+      return ZenithFallback.restoreBackupBlob(msg.backupBlob, msg.password);
+    case 'export_vault':
+      return ZenithFallback.exportVault(msg.password);
+    case 'rotate_recovery_key':
+      if (ZenithFallback.rotateRecoveryKey) {
+        const key = await ZenithFallback.rotateRecoveryKey();
+        return { success: true, recovery_key: key };
+      }
+      return { error: 'Recovery rotation not supported in fallback mode' };
+    case 'import_vault':
+      return ZenithFallback.importVault(msg.credentials);
     default:
       return { error: 'Not supported in fallback mode' };
   }
 }
 
+// ─── Query Candidates for Conditional Autofill Dropdown ──────────
+async function handleQueryCandidates(msg, sender) {
+  let origin = '';
+  try {
+    origin = sender && sender.url ? new URL(sender.url).origin : (msg.origin || '');
+  } catch (_) {
+    origin = msg.origin || '';
+  }
+  let rpId = msg.rpId;
+  if (!rpId && origin) {
+    try { rpId = new URL(origin).hostname; } catch (_) {}
+  }
+  if (!rpId) return [];
+
+  // 1. Fallback mode
+  if (useFallback) {
+    const creds = await ZenithFallback.listCredentials();
+    return (creds || [])
+      .filter(c => c.rpId === rpId || rpId.endsWith('.' + c.rpId))
+      .map(c => ({ id: c.credentialId, username: c.username, rpId: c.rpId }));
+  }
+
+  // 2. In-memory cache check (domain & subdomain matches)
+  const cachedMatches = [];
+  for (const [cachedRpId, list] of Object.entries(rpIndex)) {
+    if (cachedRpId === rpId || rpId.endsWith('.' + cachedRpId)) {
+      cachedMatches.push(...list);
+    }
+  }
+  if (cachedMatches.length > 0) {
+    return cachedMatches;
+  }
+
+  // 3. Query native host
+  try {
+    ensureConnected();
+    if (nativePort) {
+      const resp = await sendToNative('list_credentials', { domain: rpId });
+      if (resp && resp.credentials) {
+        const matches = resp.credentials.map(c => ({
+          id: c.credentialId,
+          username: c.username,
+          rpId: c.rpId,
+        }));
+        rpIndex[rpId] = matches;
+        return matches;
+      }
+    }
+  } catch (_) {}
+
+  return rpIndex[rpId] || [];
+}
+
 // ─── WebAuthn Request Handler ────────────────────────────────────
 async function handleWebAuthnRequest(msg, sender) {
   const action = msg.action === 'webauthn_create' ? 'create' : 'get';
-  const origin = msg.origin || (sender.url ? new URL(sender.url).origin : '');
 
-  const allowed = await showConfirmation(action, origin, msg.options);
+  // SECURITY: trust ONLY the sender tab's URL; a message can claim any origin.
+  let origin = '';
+  try {
+    origin = sender && sender.url ? new URL(sender.url).origin : '';
+  } catch (e) {
+    origin = '';
+  }
+  if (!origin) origin = msg.origin || '';
+  if (!origin) throw new Error('Missing origin');
+
+  // Direct 1-click login if triggered by autofill dropdown click while unlocked
+  let allowed = false;
+  if (msg.options && msg.options.from_autofill) {
+    let isUnlocked = false;
+    if (useFallback) {
+      isUnlocked = ZenithFallback._isUnlocked ? ZenithFallback._isUnlocked() : false;
+    } else {
+      try {
+        const st = await sendToNative('is_unlocked', {});
+        isUnlocked = !!(st && st.unlocked);
+      } catch (_) {}
+    }
+
+    if (isUnlocked) {
+      allowed = true; // User intentionally clicked their passkey in the dropdown
+    } else {
+      allowed = await showConfirmation('verify', origin, msg.options);
+    }
+  } else {
+    allowed = await showConfirmation(action, origin, msg.options);
+  }
+
   if (!allowed) {
     throw new Error('User denied the request');
   }
@@ -201,20 +377,45 @@ async function handleWebAuthnRequest(msg, sender) {
     }
   }
 
-  return sendToNative(
+  let resp = await sendToNative(
     msg.action === 'webauthn_create' ? 'create_credential' : 'get_assertion',
     { options: msg.options, origin }
   );
+
+  // The host refused to sign because the RP requires user verification
+  // and our verification is stale. Re-verify with the master password,
+  // then retry the assertion once.
+  if (resp && resp.needs_verification) {
+    const ok = await requestReverification(origin);
+    if (!ok) throw new Error('User denied the request');
+    resp = await sendToNative(
+      msg.action === 'webauthn_create' ? 'create_credential' : 'get_assertion',
+      { options: msg.options, origin }
+    );
+  }
+
+  if (msg.action === 'webauthn_create' && resp && !resp.error) {
+    rpIndex = {};
+  }
+
+  return resp;
+}
+
+// ─── Re-verification prompt (UV required + stale session) ────────
+// Reuses the consent window with action='verify': the window ALWAYS asks
+// for the master password (fresh verification), then resolves true.
+async function requestReverification(origin) {
+  return showConfirmation('verify', origin, null);
 }
 
 // ─── Confirmation Dialog ─────────────────────────────────────────
 async function showConfirmation(action, origin, options) {
   return new Promise((resolve) => {
-    const confirmId = Date.now() + Math.random();
+    const confirmId = crypto.randomUUID();
     confirmWindows[confirmId] = { resolve, action, origin, options };
 
     const width = 400;
-    const height = 320;
+    const height = 400;
 
     chrome.windows.create({
       url: chrome.runtime.getURL('confirm.html') + `?action=${action}&origin=${encodeURIComponent(origin)}&confirmId=${confirmId}`,
@@ -225,7 +426,7 @@ async function showConfirmation(action, origin, options) {
       if (window) {
         confirmWindows[confirmId].windowId = window.id;
       } else {
-        // Window creation failed — auto-deny
+        // Window creation failed: auto-deny
         resolve(false);
         delete confirmWindows[confirmId];
       }

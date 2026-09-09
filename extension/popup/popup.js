@@ -55,13 +55,20 @@ function setLoading(buttonId, loading) {
 // ─── Native messaging wrapper ────────────────────────────────────
 // This wrapper does NOT throw on response.error — callers handle it
 async function sendMsg(message) {
+  if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+    return { error: 'Browser extension context not available.' };
+  }
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        return reject(new Error(chrome.runtime.lastError.message));
-      }
-      resolve(response || {});
-    });
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          return resolve({ error: chrome.runtime.lastError.message });
+        }
+        resolve(response || {});
+      });
+    } catch (e) {
+      resolve({ error: e.message });
+    }
   });
 }
 
@@ -80,6 +87,7 @@ async function initPopup() {
 
     if (!vaultExists) {
       // First-time user — show create vault view
+      setFirstRunMode(false);
       showView('view-firstrun');
       return;
     }
@@ -98,6 +106,56 @@ async function initPopup() {
     // If native host is completely unavailable, try fallback detection
     showView('view-unlock');
   }
+}
+
+// ─── Recovery Mode State ──────────────────────────────────────────
+let isRecoveryMode = false;
+
+function setFirstRunMode(recovery) {
+  isRecoveryMode = recovery;
+  clearInlineError('fr-error');
+  const h2 = document.querySelector('#view-firstrun h2');
+  const desc = document.querySelector('#view-firstrun .view-desc');
+  const recInput = document.getElementById('fr-recovery-key-input');
+  const btn = document.getElementById('fr-create');
+  const backLink = document.getElementById('fr-back-unlock');
+  const pwInput = document.getElementById('fr-password');
+  const confirmInput = document.getElementById('fr-confirm');
+  const strengthBar = document.querySelector('#view-firstrun .strength-bar');
+
+  if (recInput) recInput.value = '';
+  if (pwInput) pwInput.value = '';
+  if (confirmInput) confirmInput.value = '';
+
+  if (recovery) {
+    if (h2) h2.textContent = 'Recover Vault';
+    if (desc) desc.textContent = 'Enter your emergency recovery key and set a new master password.';
+    if (recInput) recInput.classList.remove('hidden');
+    if (pwInput) pwInput.placeholder = 'New master password (8+ chars)';
+    if (confirmInput) confirmInput.placeholder = 'Confirm new password';
+    if (btn) btn.textContent = 'Recover Vault';
+    if (backLink) backLink.classList.remove('hidden');
+    if (strengthBar) strengthBar.classList.remove('hidden');
+    document.getElementById('fr-recovery')?.classList.add('hidden');
+  } else {
+    if (h2) h2.textContent = 'Create Vault';
+    if (desc) desc.textContent = 'Set a master password to encrypt your passkeys locally.';
+    if (recInput) recInput.classList.add('hidden');
+    if (pwInput) pwInput.placeholder = 'Master password (8+ characters)';
+    if (confirmInput) confirmInput.placeholder = 'Confirm password';
+    if (btn) btn.textContent = 'Create Vault';
+    if (backLink) backLink.classList.add('hidden');
+    if (strengthBar) strengthBar.classList.remove('hidden');
+    document.getElementById('fr-recovery')?.classList.add('hidden');
+  }
+}
+
+const backUnlockBtn = document.getElementById('fr-back-unlock');
+if (backUnlockBtn) {
+  backUnlockBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    showView('view-unlock');
+  });
 }
 
 // ─── Unlock ──────────────────────────────────────────────────────
@@ -132,22 +190,22 @@ async function doUnlock() {
 }
 
 // ─── Recovery link ───────────────────────────────────────────────
-document.getElementById('ul-recovery').addEventListener('click', () => {
+document.getElementById('ul-recovery').addEventListener('click', (e) => {
+  e.preventDefault();
+  setFirstRunMode(true);
   showView('view-firstrun');
-  document.querySelector('#view-firstrun h2').textContent = 'Recover Vault';
-  document.getElementById('fr-create').textContent = 'Recover';
 });
 
-// ─── Create Vault ────────────────────────────────────────────────
-document.getElementById('fr-create').addEventListener('click', doCreateVault);
+// ─── Create or Recover Vault ─────────────────────────────────────
+document.getElementById('fr-create').addEventListener('click', doCreateOrRecoverVault);
 document.getElementById('fr-password').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('fr-confirm').focus();
 });
 document.getElementById('fr-confirm').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') doCreateVault();
+  if (e.key === 'Enter') doCreateOrRecoverVault();
 });
 
-async function doCreateVault() {
+async function doCreateOrRecoverVault() {
   const pw = document.getElementById('fr-password').value;
   const confirm = document.getElementById('fr-confirm').value;
 
@@ -159,6 +217,37 @@ async function doCreateVault() {
   }
   if (pw !== confirm) {
     showInlineError('fr-error', 'Passwords do not match.');
+    return;
+  }
+
+  if (isRecoveryMode) {
+    const recKey = (document.getElementById('fr-recovery-key-input').value || '').trim();
+    if (!recKey) {
+      showInlineError('fr-error', 'Please enter your emergency recovery key.');
+      return;
+    }
+
+    setLoading('fr-create', true);
+    try {
+      const result = await sendMsg({
+        action: 'recover_vault',
+        recoveryKey: recKey,
+        newPassword: pw,
+      });
+
+      if (result.error) {
+        showInlineError('fr-error', result.error);
+      } else {
+        showToast('Vault recovered and unlocked successfully.');
+        showView('view-main');
+        loadCredentials();
+        loadSettings();
+      }
+    } catch (e) {
+      showInlineError('fr-error', e.message || 'Recovery failed.');
+    } finally {
+      setLoading('fr-create', false);
+    }
     return;
   }
 
@@ -239,6 +328,7 @@ async function loadCredentials() {
     if (result.credentials) {
       currentCredentials = result.credentials;
       renderCredentials(result.credentials);
+      checkActiveTabMatch(result.credentials);
       // Update badge
       const badge = document.getElementById('cred-count');
       if (badge) badge.textContent = result.credentials.length;
@@ -246,6 +336,67 @@ async function loadCredentials() {
   } catch (e) {
     list.innerHTML = '<p class="error-text">Failed to load credentials.</p>';
   }
+}
+
+async function checkActiveTabMatch(creds) {
+  const banner = document.getElementById('rp-match-banner');
+  const domainEl = document.getElementById('rp-match-domain');
+  const quickFillBtn = document.getElementById('rp-quick-fill-btn');
+  if (!banner || !domainEl || !quickFillBtn) return;
+
+  if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.tabs.query) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const tabs = await new Promise(res => chrome.tabs.query({ active: true, currentWindow: true }, res));
+    if (!tabs || !tabs[0] || !tabs[0].url) {
+      banner.classList.add('hidden');
+      return;
+    }
+
+    const urlObj = new URL(tabs[0].url);
+    const activeHost = urlObj.hostname.toLowerCase();
+
+    const matched = (creds || []).find(c => {
+      const rp = (c.rpId || c.rp_id || '').toLowerCase();
+      return rp && (activeHost === rp || activeHost.endsWith('.' + rp));
+    });
+
+    if (matched) {
+      const rpDomain = matched.rpId || matched.rp_id;
+      domainEl.textContent = `${rpDomain} (${matched.username || 'Passkey'})`;
+      banner.classList.remove('hidden');
+
+      quickFillBtn.onclick = () => {
+        const textToCopy = matched.username || matched.credentialId || matched.credential_id || '';
+        if (textToCopy) {
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            const label = matched.username ? `Username (${matched.username})` : `Credential for ${rpDomain}`;
+            showToast(`${label} copied to clipboard.`);
+          });
+        }
+      };
+    } else {
+      banner.classList.add('hidden');
+    }
+  } catch (e) {
+    banner.classList.add('hidden');
+  }
+}
+
+function getDomainMonogram(rawDomain) {
+  const d = (rawDomain || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+  if (d.includes('github')) return 'GH';
+  if (d.includes('google')) return 'G';
+  if (d.includes('aws') || d.includes('amazon')) return 'AWS';
+  if (d.includes('cloudflare')) return 'CF';
+  if (d.includes('apple') || d.includes('icloud')) return 'AP';
+  if (d.includes('microsoft')) return 'MS';
+  if (d.includes('binance')) return 'BN';
+  if (d.includes('gitlab')) return 'GL';
+  return d.slice(0, 2).toUpperCase() || 'ID';
 }
 
 function escapeHTML(str) {
@@ -263,28 +414,32 @@ function escapeHTML(str) {
 function renderCredentials(creds) {
   const list = document.getElementById('cred-list');
   if (!creds.length) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔑</div><p>No passkeys stored yet.</p><p class="hint">Visit a site that supports passkeys to get started.</p></div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M14 12v-2a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2"/><path d="M20 10l2 2"/><path d="M21.5 11.5l-6 6v3.5h-3.5l-1 -1"/><path d="M15.5 17l2 2"/></svg></div><p>No passkeys stored yet.</p><p class="hint">Visit a site that supports passkeys to get started.</p></div>';
     return;
   }
 
   const groups = {};
   creds.forEach(c => {
-    if (!groups[c.rpId]) groups[c.rpId] = [];
-    groups[c.rpId].push(c);
+    const domain = c.rpId || c.rp_id || 'Unknown';
+    if (!groups[domain]) groups[domain] = [];
+    groups[domain].push(c);
   });
 
   let html = '';
   Object.entries(groups).forEach(([domain, entries]) => {
+    const monogram = getDomainMonogram(domain);
     entries.forEach(c => {
-      const last = c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleDateString() : 'Never';
-      const created = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—';
-      html += `<div class="cred-item" data-credential-id="${escapeHTML(c.credentialId)}" data-rp-id="${escapeHTML(domain)}">
+      const rawLast = c.lastUsedAt || c.last_used_at;
+      const credId = c.credentialId || c.credential_id || '';
+      const last = rawLast ? new Date(rawLast).toLocaleDateString() : 'Never';
+      html += `<div class="cred-item" data-credential-id="${escapeHTML(credId)}" data-rp-id="${escapeHTML(domain)}">
+        <div class="cred-monogram" aria-hidden="true">${escapeHTML(monogram)}</div>
         <div class="cred-info">
           <div class="domain">${escapeHTML(domain)}</div>
           <div class="username">${escapeHTML(c.username || 'Unknown user')}</div>
           <div class="last-used">Last used: ${last}</div>
         </div>
-        <button class="cred-delete" title="Delete credential" data-credential-id="${escapeHTML(c.credentialId)}">
+        <button class="cred-delete" title="Delete credential" data-credential-id="${escapeHTML(credId)}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>`;
@@ -422,6 +577,38 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   showFatalError(e.reason?.message || 'Unknown Promise Rejection', null);
 });
+
+// ─── Open Dashboard Handlers ─────────────────────────────────────
+async function handleOpenDashboard(e) {
+  if (e) e.preventDefault();
+  try {
+    const res = await sendMsg({ action: 'open_dashboard' });
+    if (res && res.success) return;
+  } catch (err) {}
+
+  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.create) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
+  } else if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.openOptionsPage) {
+    chrome.runtime.openOptionsPage();
+  } else {
+    window.open('../dashboard/dashboard.html', '_blank');
+  }
+}
+
+const hdrDashBtn = document.getElementById('hdr-open-dashboard');
+if (hdrDashBtn) hdrDashBtn.addEventListener('click', handleOpenDashboard);
+
+const frDashBtn = document.getElementById('btn-firstrun-dashboard');
+if (frDashBtn) frDashBtn.addEventListener('click', handleOpenDashboard);
+
+const unlockDashBtn = document.getElementById('btn-unlock-dashboard');
+if (unlockDashBtn) unlockDashBtn.addEventListener('click', handleOpenDashboard);
+
+const credDashBtn = document.getElementById('btn-open-dashboard');
+if (credDashBtn) credDashBtn.addEventListener('click', handleOpenDashboard);
+
+const setDashBtn = document.getElementById('btn-settings-dashboard');
+if (setDashBtn) setDashBtn.addEventListener('click', handleOpenDashboard);
 
 // ─── Start ───────────────────────────────────────────────────────
 initPopup();

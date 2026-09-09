@@ -63,6 +63,7 @@ V2 vaults include AAD in all AES-GCM operations. The AAD is constructed from the
 ### Fallback mode considerations
 - In browser-only (fallback) mode, credentials are stored in `chrome.storage.local`
 - Encryption uses PBKDF2-SHA256 (not Argon2id) with 600,000 iterations
+- Fallback mode produces spec-conformant WebAuthn structures (CBOR attestation objects, COSE keys, DER signatures)
 - Keys are held in memory within the browser's JavaScript runtime
 - **Fallback mode is less secure** than native host mode — use it only when the CLI is not available
 
@@ -80,14 +81,20 @@ V2 vaults include AAD in all AES-GCM operations. The AAD is constructed from the
 zenith-passkeys change-password
 ```
 
-This re-wraps the MEK with a new password-derived key. The MEK itself does not change, so all existing credentials remain valid.
+This re-wraps the MEK with a new password-derived key. The MEK itself does not change, so all existing credentials remain valid — and **the recovery key keeps working** (both wrapping slots stay valid).
 
 ### Recovery Key
-The recovery key is generated once at vault creation. If you suspect it's compromised:
+
+The recovery key is generated once at vault creation and survives password changes and vault recovery. If you suspect it's compromised:
 1. Export your credentials: `zenith-passkeys export --out backup.enc --password`
 2. Delete the vault file
 3. Create a new vault: `zenith-passkeys init`
 4. Import your credentials: `zenith-passkeys import backup.enc`
+
+## Support
+
+Something broke? Every failure shows a short error code — copy it and email
+**zenithprojects@icloud.com**.
 
 ## Reporting Vulnerabilities
 

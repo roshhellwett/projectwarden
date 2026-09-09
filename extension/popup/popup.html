@@ -11,25 +11,48 @@
     <!-- Header -->
     <div class="header">
       <div class="header-brand">
-        <img src="../icons/icon-48.png" alt="Zenith" class="header-logo" width="24" height="24">
-        <span class="header-title">Zenith Passkeys</span>
+        <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="header-logo" width="24" height="24">
+        <div class="header-brand-text">
+          <span class="header-title">Zenith Passkeys</span>
+          <span class="header-sub">WebAuthn • FIDO2 L2</span>
+        </div>
       </div>
-      <span class="header-version">v1.0</span>
+      <div class="header-actions">
+        <button id="hdr-open-dashboard" class="header-icon-btn" title="Open Vault Dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+            <path d="M9 4v16" />
+            <path d="M14 10l2 2l-2 2" />
+          </svg>
+        </button>
+        <span class="header-version">v1.1</span>
+      </div>
     </div>
 
     <!-- First-run view -->
     <div id="view-firstrun" class="view hidden">
       <h2>Create Vault</h2>
       <p class="view-desc">Set a master password to encrypt your passkeys locally.</p>
+      <input type="text" id="fr-recovery-key-input" class="hidden" placeholder="Recovery key (XXXX-XXXX-...)" autocomplete="off" />
       <input type="password" id="fr-password" placeholder="Master password (8+ characters)" />
       <div class="strength-bar"><div id="fr-strength-fill" class="strength-fill"></div></div>
       <span id="fr-strength-label" class="strength-label"></span>
       <input type="password" id="fr-confirm" placeholder="Confirm password" />
       <div id="fr-error" class="inline-error hidden"></div>
       <button id="fr-create" data-loading-text="Creating vault...">Create Vault</button>
+      <a id="fr-back-unlock" href="#" class="hidden" style="display: block; text-align: center; margin-top: 10px; font-size: 12px; color: var(--muted); text-decoration: none;">&larr; Back to Unlock</a>
+      <div class="divider" style="margin: 12px 0 8px; height: 1px; background: var(--border);"></div>
+      <button id="btn-firstrun-dashboard" class="btn-secondary" style="width: 100%; justify-content: center; gap: 8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+          <path d="M9 4v16" />
+          <path d="M14 10l2 2l-2 2" />
+        </svg>
+        <span>Open Vault Dashboard</span>
+      </button>
       <div id="fr-recovery" class="hidden">
         <div class="recovery-card">
-          <p class="warning">⚠️ SAVE THIS RECOVERY KEY</p>
+          <p class="warning">Save this recovery key</p>
           <p class="recovery-hint">If you lose your password, this is the only way to recover your passkeys.</p>
           <pre id="fr-recovery-key"></pre>
           <label class="checkbox-label"><input type="checkbox" id="fr-checkbox" /> I have saved this key safely</label>
@@ -40,12 +63,24 @@
 
     <!-- Unlock view -->
     <div id="view-unlock" class="view hidden">
-      <div class="unlock-icon">🔒</div>
+      <div class="unlock-mark" aria-hidden="true">
+        <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="unlock-logo" width="48" height="48">
+      </div>
       <h2>Unlock Vault</h2>
+      <p class="view-desc">Enter your master password to continue.</p>
       <input type="password" id="ul-password" placeholder="Master password" autofocus />
       <div id="ul-error" class="inline-error hidden"></div>
       <button id="ul-unlock" data-loading-text="Unlocking...">Unlock</button>
       <a id="ul-recovery" href="#">Forgot password? Use Recovery Key</a>
+      <div class="divider" style="margin: 14px 0 10px; height: 1px; background: var(--border);"></div>
+      <button id="btn-unlock-dashboard" class="btn-secondary" style="width: 100%; justify-content: center; gap: 8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+          <path d="M9 4v16" />
+          <path d="M14 10l2 2l-2 2" />
+        </svg>
+        <span>Open Vault Dashboard</span>
+      </button>
     </div>
 
     <!-- Main view -->
@@ -56,16 +91,45 @@
       </div>
 
       <div id="tab-credentials" class="tab-content">
+        <!-- Active Domain Match Banner -->
+        <div id="rp-match-banner" class="rp-match-card hidden">
+          <div class="rp-match-header">
+            <span class="rp-pulse-dot"></span>
+            <span class="rp-match-title">Active Site Match</span>
+          </div>
+          <div class="rp-match-body">
+            <span id="rp-match-domain" class="rp-domain-name">github.com</span>
+            <button id="rp-quick-fill-btn" class="btn-quick-fill">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
+                <path d="M14 12v-2a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2" />
+                <path d="M20 10l2 2" /><path d="M21.5 11.5l-6 6v3.5h-3.5l-1 -1" /><path d="M15.5 17l2 2" />
+              </svg>
+              <span>Quick-Fill</span>
+            </button>
+          </div>
+        </div>
+
         <div class="search-wrapper">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span class="search-icon" aria-hidden="true">
+            <!-- Tabler search (MIT) -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg>
+          </span>
           <input type="text" id="cred-search" placeholder="Search passkeys..." />
         </div>
         <div id="cred-list"></div>
+        <button id="btn-open-dashboard" class="btn-dashboard-banner" title="Open Full Vault Dashboard">
+          <span>Open Vault Dashboard</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+            <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />
+            <path d="M11 13l9 -9" />
+            <path d="M15 4h5v5" />
+          </svg>
+        </button>
       </div>
 
       <div id="tab-settings" class="tab-content hidden">
         <div class="setting-row">
-          <label>Auto-lock timeout</label>
+          <label for="set-timeout">Auto-lock timeout</label>
           <select id="set-timeout">
             <option value="5">5 min</option>
             <option value="15" selected>15 min</option>
@@ -78,23 +142,53 @@
           <span id="set-host-status" class="status-badge">Checking...</span>
         </div>
         <div class="settings-divider"></div>
-        <button id="set-lock" class="btn-secondary btn-lock">🔒 Lock Vault</button>
+        <button id="btn-settings-dashboard" class="btn-secondary" style="margin-bottom: 8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+            <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" />
+            <path d="M9 4v16" />
+            <path d="M14 10l2 2l-2 2" />
+          </svg>
+          Open Vault Dashboard
+        </button>
+        <button id="set-lock" class="btn-secondary btn-lock">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 11a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-8z"/><path d="M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M8 11v-4a4 4 0 1 1 8 0v4"/></svg>
+          Lock Vault
+        </button>
+        <div class="settings-divider"></div>
+        <div class="about-card">
+          <div class="about-header">
+            <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="about-logo" width="18" height="18">
+            <strong class="about-title">Zenith Passkeys</strong>
+            <span class="about-tag">v1.1.0</span>
+          </div>
+          <p class="about-text">This software is built and managed by <strong>Zenith Open Source Projects</strong>.</p>
+          <p class="about-meta">100% Local-First &bull; Zero Cloud &bull; Air-Gapped Vault</p>
+        </div>
       </div>
     </div>
 
     <!-- Fallback banner -->
     <div id="fallback-banner" class="hidden">
-      ⚠️ Browser-only mode — install the <strong>zenith-passkeys</strong> CLI for full backup & sync support.
+      Browser-only mode is active. Install the <strong>zenith-passkeys</strong> CLI for the encrypted local vault and full feature set.
     </div>
 
     <!-- Error view -->
     <div id="view-error" class="view hidden" style="text-align: center; padding: 20px 0;">
-      <div class="error-icon">⚠️</div>
+      <div class="empty-icon" aria-hidden="true">
+        <!-- Tabler alert-triangle (MIT) -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4"/><path d="M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M10.24 3.957l-8.38 14.598a2 2 0 0 0 1.76 2.945h16.76a2 2 0 0 0 1.76 -2.945l-8.38 -14.598a2 2 0 0 0 -3.52 0z"/></svg>
+      </div>
       <h2 style="color: var(--danger);">Something went wrong</h2>
-      <p style="font-size: 13px; margin-bottom: 12px; color: var(--text-muted);">Please share this error code for support:</p>
-      <input type="text" id="error-code-input" readonly style="font-family: monospace; font-size: 12px; color: var(--danger); border-color: var(--danger); text-align: center; margin-bottom: 12px;" />
+      <p style="font-size: 13px; margin: 8px 0; color: var(--muted);">Please share this error code for support:</p>
+      <input type="text" id="error-code-input" readonly style="font-size: 12px; color: var(--danger); border-color: var(--danger-border); text-align: center;" />
+      <p style="font-size: 12px; margin-bottom: 12px;">Contact <a href="mailto:zenithprojects@icloud.com" style="display: inline;">zenithprojects@icloud.com</a></p>
       <button id="error-copy-btn" class="btn-secondary">Copy Error Code</button>
     </div>
+
+    <!-- Footer branding -->
+    <footer class="app-footer">
+      <span>Built and managed by <strong>Zenith Open Source Projects</strong></span>
+    </footer>
   </div>
 
   <!-- Toast container -->

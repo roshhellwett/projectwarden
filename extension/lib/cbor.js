@@ -1,3 +1,6 @@
+// Minimal, spec-correct CBOR encoder/decoder for the fallback vault.
+// Operates on Uint8Array end-to-end (ArrayBuffer `+` does NOT concatenate
+// in JS — the previous version relied on that and silently produced strings).
 class CborEncoder {
   encode(value) { return this._encode(value); }
 
@@ -12,18 +15,28 @@ class CborEncoder {
     }
     if (typeof value === 'string') {
       const bytes = new TextEncoder().encode(value);
-      return this._encodeUint(bytes.length, 3) + new Uint8Array(bytes).buffer;
+      return this._concat([this._encodeUint(bytes.length, 3), bytes]);
     }
-    if (value instanceof Uint8Array) return this._encodeUint(value.length, 2) + value.buffer;
+    if (value instanceof Uint8Array) {
+      return this._concat([this._encodeUint(value.length, 2), value]);
+    }
+    if (value instanceof ArrayBuffer) {
+      return this._encode(new Uint8Array(value));
+    }
     if (Array.isArray(value)) {
       const parts = [this._encodeUint(value.length, 4)];
       value.forEach(v => parts.push(this._encode(v)));
       return this._concat(parts);
     }
+    if (value instanceof Map) {
+      // Map support: preserves non-string keys (integers for COSE keys).
+      const parts = [this._encodeUint(value.size, 5)];
+      value.forEach((v, k) => { parts.push(this._encode(k)); parts.push(this._encode(v)); });
+      return this._concat(parts);
+    }
     if (typeof value === 'object') {
-      const keys = Object.keys(value);
-      const parts = [this._encodeUint(keys.length, 5)];
-      keys.forEach(k => { parts.push(this._encode(k)); parts.push(this._encode(value[k])); });
+      const parts = [this._encodeUint(Object.keys(value).length, 5)];
+      Object.keys(value).forEach(k => { parts.push(this._encode(k)); parts.push(this._encode(value[k])); });
       return this._concat(parts);
     }
     throw new Error('Cannot encode ' + typeof value);
@@ -31,28 +44,40 @@ class CborEncoder {
 
   _encodeUint(value, major) {
     const header = major << 5;
-    if (value < 24) return new Uint8Array([header | value]).buffer;
-    if (value < 256) return new Uint8Array([header | 24, value]).buffer;
-    if (value < 65536) { const b = new ArrayBuffer(3); const v = new DataView(b); v.setUint8(0, header | 25); v.setUint16(1, value); return b; }
-    const b = new ArrayBuffer(5); const v = new DataView(b); v.setUint8(0, header | 26); v.setUint32(1, value); return b;
+    if (value < 24) return new Uint8Array([header | value]);
+    if (value < 256) return new Uint8Array([header | 24, value]);
+    if (value < 65536) {
+      const b = new Uint8Array(3);
+      b[0] = header | 25;
+      new DataView(b.buffer).setUint16(1, value);
+      return b;
+    }
+    const b = new Uint8Array(5);
+    b[0] = header | 26;
+    new DataView(b.buffer).setUint32(1, value);
+    return b;
   }
 
   _encodeFloat(value) {
-    const b = new ArrayBuffer(9); const v = new DataView(b); v.setUint8(0, 251); v.setFloat64(1, value); return b;
+    const b = new Uint8Array(9);
+    b[0] = 0xfb;
+    new DataView(b.buffer).setFloat64(1, value);
+    return b;
   }
 
   _concat(parts) {
     const total = parts.reduce((s, p) => s + p.byteLength, 0);
     const result = new Uint8Array(total);
     let offset = 0;
-    parts.forEach(p => { result.set(new Uint8Array(p), offset); offset += p.byteLength; });
-    return result.buffer;
+    parts.forEach(p => { result.set(p, offset); offset += p.byteLength; });
+    return result;
   }
 }
 
 class CborDecoder {
   decode(buffer) {
-    this._view = new DataView(buffer);
+    this._view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    this._bytes = buffer;
     this._offset = 0;
     return this._decode();
   }
@@ -65,10 +90,9 @@ class CborDecoder {
     switch (major) {
       case 0: return value;
       case 1: return -1 - value;
-      case 2: return new Uint8Array(this._view.buffer, this._view.byteOffset + this._offset, value);
+      case 2: return this._bytes.subarray(this._offset, (this._offset += value));
       case 3: {
-        const bytes = new Uint8Array(this._view.buffer, this._view.byteOffset + this._offset, value);
-        this._offset += value;
+        const bytes = this._bytes.subarray(this._offset, (this._offset += value));
         return new TextDecoder().decode(bytes);
       }
       case 4: { const arr = []; for (let i = 0; i < value; i++) arr.push(this._decode()); return arr; }
@@ -77,10 +101,7 @@ class CborDecoder {
         if (value === 20) return false;
         if (value === 21) return true;
         if (value === 22) return null;
-        if (value === 25) {
-          const half = this._view.getUint16(this._offset - 2);
-          return this._halfToFloat(half);
-        }
+        if (value === 25) return this._halfToFloat(this._view.getUint16(this._offset - 2));
         if (value === 26) return this._view.getFloat32(this._offset - 4);
         if (value === 27) return this._view.getFloat64(this._offset - 8);
         return value;
@@ -111,4 +132,16 @@ class CborDecoder {
     if (exp === 31) return mant ? NaN : (sign ? -Infinity : Infinity);
     return (sign ? -1 : 1) * Math.pow(2, exp - 15) * (1 + mant / 1024);
   }
+}
+
+if (typeof self !== 'undefined') {
+  self.CborEncoder = CborEncoder;
+  self.CborDecoder = CborDecoder;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.CborEncoder = CborEncoder;
+  globalThis.CborDecoder = CborDecoder;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { CborEncoder, CborDecoder };
 }

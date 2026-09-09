@@ -1,11 +1,14 @@
 import click
+from cryptography.exceptions import InvalidTag
 from rich.console import Console
 from rich.markup import escape
-from ..core.vault import VaultManager
+
 from ..core.credentials import delete_credential
-from cryptography.exceptions import InvalidTag
+from ..core.vault import VaultManager
+from ._shared import handle_vault_error, require_vault
 
 console = Console()
+
 
 @click.command()
 @click.argument("domain")
@@ -14,16 +17,13 @@ console = Console()
 def delete(domain: str, credential_id: str | None, force: bool):
     """Delete a passkey credential by domain."""
     vault = VaultManager()
-    if not vault.exists():
-        console.print("[red]No vault found. Run 'zenith-passkeys init' first.[/red]")
-        raise SystemExit(1)
+    require_vault(vault)
 
-    password = click.prompt("Master password", hide_input=True)
+    from ._shared import unlock_vault
     try:
-        payload, mek = vault.unlock(password)
-    except InvalidTag:
-        console.print("[red]Wrong password.[/red]")
-        raise SystemExit(1)
+        (payload, mek), _pw = unlock_vault(vault)
+    except (InvalidTag, ValueError) as e:
+        handle_vault_error(e)
 
     # Find matching credentials
     matches = [c for c in payload.credentials if c.rp_id == domain]
@@ -44,7 +44,7 @@ def delete(domain: str, credential_id: str | None, force: bool):
     target = matches[0]
 
     if not force:
-        console.print(f"\n[bold]About to delete:[/bold]")
+        console.print("\n[bold]About to delete:[/bold]")
         console.print(f"  Domain:   {escape(target.rp_id)}")
         console.print(f"  Username: {escape(target.username)}")
         console.print(f"  ID:       {target.credential_id[:20]}...")

@@ -1,10 +1,16 @@
-from .schema import VaultPayload, Credential
 from datetime import datetime, timezone
 
+from .schema import Credential, VaultPayload
+
+
 def add_credential(payload: VaultPayload, cred: Credential) -> VaultPayload:
-    # Remove existing credential with same rp_id and username to prevent duplicates
+    # Identical credential_id = duplicate credential; WebAuthn IDs are unique.
+    if any(c.credential_id == cred.credential_id for c in payload.credentials):
+        raise ValueError(f"Credential {cred.credential_id} already exists")
+    # Replace an existing credential with same rp_id + username so re-registering
+    # a site does not pile up duplicates for the same account.
     payload.credentials = [
-        c for c in payload.credentials 
+        c for c in payload.credentials
         if not (c.rp_id == cred.rp_id and c.username == cred.username)
     ]
     if not cred.created_at:
@@ -12,11 +18,13 @@ def add_credential(payload: VaultPayload, cred: Credential) -> VaultPayload:
     payload.credentials.append(cred)
     return payload
 
+
 def find_credentials(payload: VaultPayload, rp_id: str, allow_list: list[str] | None = None) -> list[Credential]:
     results = [c for c in payload.credentials if c.rp_id == rp_id]
     if allow_list:
         results = [c for c in results if c.credential_id in allow_list]
     return results
+
 
 def update_counter(payload: VaultPayload, credential_id: str, new_counter: int) -> VaultPayload:
     for cred in payload.credentials:
@@ -25,6 +33,7 @@ def update_counter(payload: VaultPayload, credential_id: str, new_counter: int) 
             cred.last_used_at = datetime.now(timezone.utc).isoformat()
             return payload
     raise ValueError(f"Credential {credential_id} not found")
+
 
 def delete_credential(payload: VaultPayload, credential_id: str) -> VaultPayload:
     original_len = len(payload.credentials)

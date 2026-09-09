@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenith Passkeys — Vault Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div id="dashboard-app" class="dashboard-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="brand-logo" width="32" height="32">
+        <div class="brand-text">
+          <span class="brand-title">Zenith Passkeys</span>
+          <span class="brand-subtitle">Vault Dashboard</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="passkeys">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 12v-2a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2" />
+            <path d="M20 10l2 2" /><path d="M21.5 11.5l-6 6v3.5h-3.5l-1 -1" /><path d="M15.5 17l2 2" />
+          </svg>
+          <span>Passkeys</span>
+          <span id="nav-cred-count" class="nav-badge">0</span>
+        </button>
+
+        <button class="nav-item" data-view="audit">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3z" />
+            <path d="M9 12l2 2l4 -4" />
+          </svg>
+          <span>Security Audit</span>
+          <span id="nav-audit-badge" class="nav-badge status-good">Good</span>
+        </button>
+
+        <button class="nav-item" data-view="logs">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+            <path d="M12 7v5l3 3" />
+          </svg>
+          <span>Activity Log</span>
+        </button>
+
+        <button class="nav-item" data-view="backup">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+            <path d="M7 11l5 5l5 -5" />
+            <path d="M12 4l0 12" />
+          </svg>
+          <span>Backup &amp; Restore</span>
+        </button>
+
+        <button class="nav-item" data-view="import-export">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+            <path d="M9 14l3 3l3 -3" />
+          </svg>
+          <span>Import &amp; Export</span>
+        </button>
+
+        <button class="nav-item" data-view="settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+            <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+          </svg>
+          <span>Vault Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="host-status-indicator">
+          <span id="sidebar-status-dot" class="status-dot"></span>
+          <span id="sidebar-status-text" class="status-label">Checking vault...</span>
+        </div>
+        <button id="sidebar-lock-btn" class="sidebar-action-btn" title="Lock vault now">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 11a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-8z" />
+            <path d="M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+            <path d="M8 11v-4a4 4 0 1 1 8 0v4" />
+          </svg>
+          <span>Lock Vault</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 id="page-title" class="page-title">Passkeys Vault</h1>
+          <span class="version-chip">v1.1 • FIDO2</span>
+        </div>
+        <div class="topbar-right">
+          <span class="attribution-pill">Built and managed by <strong>Zenith Open Source Projects</strong></span>
+        </div>
+      </header>
+
+      <!-- View: First-Run Create Vault (when no vault exists) -->
+      <section id="view-firstrun" class="content-view hidden">
+        <div class="gate-card">
+          <div class="gate-icon-wrapper">
+            <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="gate-logo" width="56" height="56">
+          </div>
+          <h2 class="gate-title">Create Your Vault</h2>
+          <p class="gate-desc">Set a master password to encrypt your passkeys locally with zero cloud dependencies.</p>
+          <div class="gate-form">
+            <input type="password" id="fr-dash-password" placeholder="Master password (8+ characters)" autocomplete="new-password" />
+            <input type="password" id="fr-dash-confirm" placeholder="Confirm master password" autocomplete="new-password" />
+            <div id="fr-dash-error" class="inline-error hidden"></div>
+            <button id="fr-dash-create-btn" class="btn-primary">Create Secure Vault</button>
+            <div id="fr-dash-recovery-wrap" class="hidden" style="margin-top: 16px; text-align: left;">
+              <div class="recovery-box">
+                <p class="recovery-box-note" style="color: var(--accent); font-weight: 600;">Save your emergency recovery key:</p>
+                <pre id="fr-dash-recovery-display" class="recovery-text" style="filter: none; user-select: all; margin: 10px 0;"></pre>
+                <button id="fr-dash-continue-btn" class="btn-primary" style="margin-top: 8px; width: 100%;">Continue to Passkeys</button>
+              </div>
+            </div>
+            <div style="margin-top: 14px; text-align: center;">
+              <a href="#" id="dash-switch-unlock" style="color: var(--muted); font-size: 12px; text-decoration: none;">Already have a vault? Unlock here</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Unlock (when vault is locked) -->
+      <section id="view-unlock" class="content-view hidden">
+        <div class="gate-card">
+          <div class="gate-icon-wrapper">
+            <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="gate-logo" width="56" height="56">
+          </div>
+          <h2 class="gate-title">Unlock Your Vault</h2>
+          <p class="gate-desc">Enter your master password to decrypt your passkeys and access dashboard management tools.</p>
+          <div class="gate-form">
+            <input type="password" id="unlock-input" placeholder="Master password" autofocus />
+            <div id="unlock-error" class="inline-error hidden"></div>
+            <button id="unlock-submit-btn" class="btn-primary">Unlock Vault</button>
+            <div style="margin-top: 14px; text-align: center; display: flex; flex-direction: column; gap: 8px;">
+              <a href="#" id="dash-switch-recovery" style="color: var(--accent); font-size: 12px; text-decoration: none;">Forgot password? Recover vault with Recovery Key</a>
+              <a href="#" id="dash-switch-firstrun" style="color: var(--muted); font-size: 12px; text-decoration: none;">Need a new vault? Create vault here</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View: Vault Recovery (when user forgot master password) -->
+      <section id="view-recovery" class="content-view hidden">
+        <div class="gate-card">
+          <div class="gate-icon-wrapper">
+            <img src="../icons/icon-48.png" alt="Zenith Passkeys" class="gate-logo" width="56" height="56">
+          </div>
+          <h2 class="gate-title">Recover Your Vault</h2>
+          <p class="gate-desc">Enter your 32-character Emergency Recovery Key to decrypt your vault and set a new master password.</p>
+          <div class="gate-form">
+            <input type="text" id="dash-recovery-key" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" spellcheck="false" autocomplete="off" />
+            <input type="password" id="dash-recovery-password" placeholder="New master password (8+ chars)" autocomplete="new-password" />
+            <input type="password" id="dash-recovery-confirm" placeholder="Confirm new master password" autocomplete="new-password" />
+            <div id="dash-recovery-error" class="inline-error hidden"></div>
+            <button id="dash-recovery-submit-btn" class="btn-primary">Recover Vault &amp; Set Password</button>
+            <div style="margin-top: 14px; text-align: center;">
+              <a href="#" id="dash-switch-back-unlock" style="color: var(--muted); font-size: 12px; text-decoration: none;">Remembered password? Back to Unlock</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 1: Passkeys Vault -->
+      <section id="view-passkeys" class="content-view active">
+        <!-- KPI Telemetry Grid -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Stored Passkeys</span>
+              <div class="kpi-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 12v-2a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2" />
+                  <path d="M20 10l2 2" /><path d="M21.5 11.5l-6 6v3.5h-3.5l-1 -1" /><path d="M15.5 17l2 2" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-cred-count">0</div>
+            <div class="kpi-subtext" id="kpi-cred-sub">Resident WebAuthn credentials</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Security Posture</span>
+              <div class="kpi-icon-box kpi-icon-success">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3a12 12 0 0 0 8.5 3A12 12 0 0 1 12 21 12 12 0 0 1 3.5 6 12 12 0 0 0 12 3z" />
+                  <path d="M9 12l2 2l4 -4" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value kpi-val-success" id="kpi-security-score">100 / 100</div>
+            <div class="kpi-subtext">Argon2id + AES-256-GCM • Air-Gapped</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Backup Health</span>
+              <div class="kpi-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                  <path d="M7 11l5 5l5 -5" />
+                  <path d="M12 4l0 12" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-backup-status">Encrypted</div>
+            <div class="kpi-subtext" id="kpi-backup-sub">SHA-256 integrity verified</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-label">Auto-Lock Protection</span>
+              <div class="kpi-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                  <path d="M12 7v5l3 3" />
+                </svg>
+              </div>
+            </div>
+            <div class="kpi-value" id="kpi-autolock-val">15 min</div>
+            <div class="kpi-subtext">Zero-trust memory clearing</div>
+          </div>
+        </div>
+
+        <div class="view-header">
+          <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+              <path d="M21 21l-6 -6" />
+            </svg>
+            <input type="text" id="passkey-search" placeholder="Search passkeys by domain or username..." />
+            <span class="search-hint">⌘K</span>
+          </div>
+          <div class="view-actions">
+            <button id="refresh-passkeys-btn" class="btn-secondary btn-icon" title="Refresh list">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" />
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" />
+              </svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="passkeys-table-wrapper" class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Domain / Service</th>
+                <th>Username</th>
+                <th>Credential ID</th>
+                <th>Last Used</th>
+                <th>Created</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="passkeys-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+          <div id="passkeys-empty" class="empty-placeholder hidden">
+            <div class="empty-icon-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 12v-2a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2" />
+                <path d="M20 10l2 2" /><path d="M21.5 11.5l-6 6v3.5h-3.5l-1 -1" />
+              </svg>
+            </div>
+            <h3>No Passkeys Stored</h3>
+            <p>Visit any WebAuthn-enabled site (like GitHub, Google, or Cloudflare) to register a passkey.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 2: Security Audit -->
+      <section id="view-audit" class="content-view hidden">
+        <div class="cards-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Vault Health Score</span>
+              <span id="audit-grade-pill" class="grade-pill grade-a">Grade A</span>
+            </div>
+            <div class="stat-number" id="audit-score-num">100 / 100</div>
+            <div class="stat-desc" id="audit-score-desc">All security parameters and passkey freshness checks passing.</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Vault Architecture</span>
+              <span class="badge badge-success">Air-Gapped</span>
+            </div>
+            <div class="stat-number">100% Local</div>
+            <div class="stat-desc">Zero cloud exposure. Master key never leaves this machine.</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Cryptography</span>
+              <span class="badge badge-primary">Argon2id + AES-GCM</span>
+            </div>
+            <div class="stat-number">256-bit</div>
+            <div class="stat-desc">Military-grade key derivation with memory-hard brute-force protection.</div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-header">
+            <h3>Audit Findings &amp; Diagnostics</h3>
+            <button id="run-audit-btn" class="btn-secondary btn-sm">Re-run Audit</button>
+          </div>
+          <div id="audit-findings-list" class="findings-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+      <!-- View 3: Activity Log -->
+      <section id="view-logs" class="content-view hidden">
+        <div class="section-card">
+          <div class="section-card-header">
+            <div>
+              <h3>Vault Action Log</h3>
+              <p class="section-card-sub">Real-time internal security trail of WebAuthn ceremonies and authentication events.</p>
+            </div>
+            <button id="refresh-logs-btn" class="btn-secondary btn-sm">Refresh Log</button>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="logs-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+            <div id="logs-empty" class="empty-placeholder hidden">
+              <p>No activity logged in this session yet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 4: Backup & Restore -->
+      <section id="view-backup" class="content-view hidden">
+        <div class="two-column-grid">
+          <!-- Create Backup Card -->
+          <div class="section-card">
+            <div class="card-icon-title">
+              <div class="card-badge-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                  <path d="M7 11l5 5l5 -5" />
+                  <path d="M12 4l0 12" />
+                </svg>
+              </div>
+              <div>
+                <h3>Create Encrypted Backup</h3>
+                <p class="section-card-sub">Export an encrypted snapshot file to store on a USB pendrive, external drive, or cold storage.</p>
+              </div>
+            </div>
+
+            <div class="backup-specs-box">
+              <div class="spec-row">
+                <span class="spec-label">Format:</span>
+                <span class="spec-val">Zenith Encrypted Binary (.enc)</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-label">Encryption:</span>
+                <span class="spec-val">Argon2id + AES-256-GCM</span>
+              </div>
+              <div class="spec-row">
+                <span class="spec-label">Protection:</span>
+                <span class="spec-val">Your current master password</span>
+              </div>
+            </div>
+
+            <button id="download-backup-btn" class="btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                <path d="M7 11l5 5l5 -5" />
+                <path d="M12 4l0 12" />
+              </svg>
+              <span>Download Encrypted Backup</span>
+            </button>
+            <div id="backup-meta-info" class="meta-note hidden"></div>
+          </div>
+
+          <!-- Restore Backup Card -->
+          <div class="section-card">
+            <div class="card-icon-title">
+              <div class="card-badge-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -5v5h5" />
+                  <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 5v-5h-5" />
+                </svg>
+              </div>
+              <div>
+                <h3>Restore From Backup</h3>
+                <p class="section-card-sub">Pre-flight in-memory decryption check protects your vault before any file changes occur.</p>
+              </div>
+            </div>
+
+            <div class="drop-zone" id="restore-drop-zone">
+              <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
+                <path d="M9 15l3 -3l3 3" />
+                <path d="M12 12l0 9" />
+              </svg>
+              <p class="drop-text">Click to select or drag &amp; drop a <strong>.enc</strong> or <strong>.json</strong> backup file</p>
+              <input type="file" id="restore-file-input" accept=".enc,.json" class="file-input-hidden" />
+            </div>
+
+            <div id="restore-selected-info" class="selected-file-banner hidden">
+              <span id="restore-file-name" class="file-name"></span>
+              <button id="restore-clear-file" class="btn-text">Remove</button>
+            </div>
+
+            <div class="restore-password-row">
+              <label for="restore-password-input">Master password of the backup file:</label>
+              <input type="password" id="restore-password-input" placeholder="Password that was used when backup was created" />
+            </div>
+
+            <div id="restore-error" class="inline-error hidden"></div>
+
+            <button id="execute-restore-btn" class="btn-danger" disabled>
+              <span>Verify &amp; Restore Vault</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 5: Import & Export -->
+      <section id="view-import-export" class="content-view hidden">
+        <div class="two-column-grid">
+          <!-- Import Card -->
+          <div class="section-card">
+            <h3>Import Passkeys</h3>
+            <p class="section-card-sub">Migrate passkeys from another Zenith instance, Bitwarden, or 1Password export.</p>
+            
+            <div class="drop-zone" id="import-drop-zone">
+              <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                <path d="M12 11v6" /><path d="M9 14l3 3l3 -3" />
+              </svg>
+              <p class="drop-text">Select or drag &amp; drop a <strong>.json</strong> passkey export file</p>
+              <input type="file" id="import-file-input" accept=".json" class="file-input-hidden" />
+            </div>
+
+            <div id="import-selected-info" class="selected-file-banner hidden" style="margin-top: 10px;">
+              <span id="import-file-name" class="file-name"></span>
+              <button id="import-clear-file" class="btn-text">Remove</button>
+            </div>
+
+            <div id="import-password-section" class="password-fields hidden" style="margin-top: 12px;">
+              <label for="import-password-input">Export Password (required for encrypted export):</label>
+              <input type="password" id="import-password-input" placeholder="Password used when exporting" />
+            </div>
+
+            <div id="import-status" class="inline-error hidden"></div>
+            <button id="execute-import-btn" class="btn-primary" disabled>Import Passkeys</button>
+          </div>
+
+          <!-- Export Card -->
+          <div class="section-card">
+            <h3>Export Passkeys</h3>
+            <p class="section-card-sub">Export your credentials for migration or archival.</p>
+
+            <div class="setting-block">
+              <label class="checkbox-label">
+                <input type="checkbox" id="export-encrypt-toggle" checked />
+                <span>Encrypt export file with a dedicated password (Recommended)</span>
+              </label>
+            </div>
+
+            <div id="export-password-section" class="password-fields">
+              <label for="export-password-input">Export Password:</label>
+              <input type="password" id="export-password-input" placeholder="Create a password for this export" />
+            </div>
+
+            <button id="execute-export-btn" class="btn-secondary">Export Credentials</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 6: Settings -->
+      <section id="view-settings" class="content-view hidden">
+        <div class="two-column-grid">
+          <!-- Change Password Card -->
+          <div class="section-card">
+            <h3>Change Master Password</h3>
+            <p class="section-card-sub">Re-encrypts the master encryption key under a new password. Recovery key remains unchanged.</p>
+
+            <div class="form-group">
+              <label for="cp-old-password">Current Master Password</label>
+              <input type="password" id="cp-old-password" placeholder="Enter current password" />
+            </div>
+
+            <div class="form-group">
+              <label for="cp-new-password">New Master Password</label>
+              <input type="password" id="cp-new-password" placeholder="At least 8 characters" />
+            </div>
+
+            <div class="form-group">
+              <label for="cp-confirm-password">Confirm New Password</label>
+              <input type="password" id="cp-confirm-password" placeholder="Re-enter new password" />
+            </div>
+
+            <div id="cp-error" class="inline-error hidden"></div>
+            <div id="cp-success" class="inline-success hidden"></div>
+
+            <button id="change-password-btn" class="btn-primary">Update Master Password</button>
+          </div>
+
+          <!-- Preferences & Recovery Card -->
+          <div class="section-card">
+            <h3>Vault Preferences</h3>
+            <p class="section-card-sub">Configure auto-lock and access credentials safety.</p>
+
+            <div class="form-group">
+              <label for="dash-timeout">Auto-Lock Inactivity Timeout</label>
+              <select id="dash-timeout">
+                <option value="5">5 minutes</option>
+                <option value="15" selected>15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">60 minutes</option>
+              </select>
+            </div>
+
+            <div class="divider"></div>
+
+            <h3>Emergency Recovery Key</h3>
+            <p class="section-card-sub">Zero-knowledge protection: recovery keys are never stored on disk or in the browser. If you misplaced your original key, you can safely generate a new active recovery key below.</p>
+
+            <div class="recovery-box">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="status-dot status-good" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #10b981;"></span>
+                  <span style="font-size: 12px; font-weight: 600; color: #10b981;">Recovery Slot Active</span>
+                </div>
+                <button id="dash-rotate-recovery-btn" class="btn-secondary" style="font-size: 11px; padding: 5px 10px; cursor: pointer;">Generate New Recovery Key</button>
+              </div>
+
+              <p class="recovery-box-note" id="dash-recovery-note">Keep your recovery key safely stored in a physical notebook or cold storage. If you lose your master password, use the "Recover Vault" option on the unlock screen.</p>
+              
+              <div class="recovery-blur-wrapper" style="margin: 10px 0;">
+                <pre id="dash-recovery-display" class="recovery-text" style="filter: none; user-select: all; text-align: center; font-size: 13px; letter-spacing: 1px;">•••• •••• •••• •••• •••• •••• •••• ••••</pre>
+              </div>
+
+              <div id="dash-recovery-actions" class="hidden" style="display: flex; gap: 8px; margin-top: 10px;">
+                <button id="dash-copy-recovery-btn" class="btn-primary" style="font-size: 12px; padding: 6px 12px; flex: 1;">Copy Recovery Key</button>
+                <button id="dash-toggle-blur-btn" class="btn-secondary" style="font-size: 12px; padding: 6px 12px;">Hide</button>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="about-zenith-box">
+              <img src="../icons/icon-48.png" alt="Zenith Passkeys" width="24" height="24" class="about-logo">
+              <div>
+                <strong>Zenith Passkeys v1.1.0</strong>
+                <p>This software is built and managed by <strong>Zenith Open Source Projects</strong>.</p>
+                <span class="meta-tag">100% Local-First &bull; Zero Cloud &bull; Air-Gapped</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Delete Modal -->
+  <div id="delete-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>Delete Passkey</h3>
+      <p id="delete-modal-text">Are you sure you want to delete this passkey? This cannot be undone.</p>
+      <div class="modal-actions">
+        <button id="delete-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="delete-confirm-btn" class="btn-danger">Delete Permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script src="../lib/cbor.js"></script>
+  <script src="../fallback-vault.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

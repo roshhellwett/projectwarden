@@ -7,11 +7,10 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+**/dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -30,9 +29,12 @@ env/
 env.bak/
 venv.bak/
 
-# Environment Variables
+# Environment Variables & Secrets
 .env
-.env.local
+.env.*
+*.token
+*token*.json
+gdrive_token.json
 
 # Unit test / coverage reports
 htmlcov/
@@ -49,7 +51,7 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# IDE / Editor
+# IDE / Editor / OS
 .vscode/
 .idea/
 *.swp
@@ -60,21 +62,23 @@ Thumbs.db
 *.tmp
 *~
 
-# Project specific
+# Build & Release Archives (build on-demand with scripts/build_extension_zip.py)
+*.zip
+*.crx
+*.tar.gz
+
+# Scratch & Debug Workspaces
+scratch/
 /plan.md
-/audit_test.py
-/cli/tests/audit_test.py
+cli/fix_tests.py
+cli/test_debug.py
+cli/test_host.py
 
 # Sensitive files — NEVER commit these
 vault.enc
 *.enc
-gdrive_token.json
 host_debug.log
-
-# Debug/temp scripts
-cli/fix_tests.py
-cli/test_debug.py
-cli/test_host.py
+extension_id.txt
 
 # Native host manifests (generated per-machine)
 native-manifests/

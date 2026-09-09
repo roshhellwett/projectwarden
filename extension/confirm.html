@@ -5,122 +5,285 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zenith Passkeys</title>
   <style>
+    /* Zenith Passkeys consent window. Tokens mirror popup.css: one light
+       theme + one dark theme, accent lock, 8px controls / 12px cards,
+       pill badges. System font stack, no remote fetches. */
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f5fa;
+      --surface: #ffffff;
+      --ink: #1c2036;
+      --muted: #5c6480;
+      --accent: #3b5bdb;
+      --accent-text: #3450d0;
+      --accent-soft: rgba(59, 91, 219, 0.10);
+      --accent-glow: rgba(59, 91, 219, 0.16);
+      --accent-hover: #334bc4;
+      --accent-contrast: #ffffff;
+      --border: #e3e6f0;
+      --border-strong: #c9cede;
+      --danger: #d92d20;
+      --danger-bg: #fef1f0;
+      --danger-border: #f5c2bd;
+      --shadow-pop: 0 12px 32px rgba(28, 32, 54, 0.18);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1120;
+        --surface: #161a2e;
+        --ink: #e9ebf8;
+        --muted: #9aa3c0;
+        --accent: #4a63e6;
+        --accent-text: #9db1f5;
+        --accent-soft: rgba(93, 120, 245, 0.16);
+        --accent-glow: rgba(93, 120, 245, 0.28);
+        --accent-hover: #5a73ef;
+        --accent-contrast: #ffffff;
+        --border: #262c47;
+        --border-strong: #3a4166;
+        --danger: #ff7a7d;
+        --danger-bg: rgba(217, 45, 32, 0.12);
+        --danger-border: rgba(217, 45, 32, 0.35);
+        --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.55);
+      }
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f7f9fc;
-      color: #1e293b;
-      width: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      width: 100vw;
       height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       -webkit-font-smoothing: antialiased;
+      font-size: 14px;
     }
+
     .container {
-      text-align: center;
-      padding: 32px;
-      background: #ffffff;
+      background: var(--surface);
       border-radius: 16px;
-      box-shadow: 0 10px 25px -5px rgba(59, 91, 219, 0.1), 0 8px 10px -6px rgba(59, 91, 219, 0.1);
-      border: 1px solid #e2e8f0;
-      max-width: 320px;
-      width: 90%;
-      animation: popIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-pop);
+      padding: 22px;
+      max-width: 340px;
+      width: calc(100% - 32px);
+      animation: cardIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    @keyframes popIn {
-      0% { opacity: 0; transform: scale(0.95) translateY(10px); }
-      100% { opacity: 1; transform: scale(1) translateY(0); }
+    @keyframes cardIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
-    .icon {
-      font-size: 56px;
-      margin-bottom: 20px;
-      display: inline-block;
-      animation: float 3s ease-in-out infinite;
+
+    .mark {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 14px;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     }
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
+    .mark-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 12px;
     }
-    h2 { 
-      margin-bottom: 12px; 
-      color: #3b5bdb; 
+
+    h2 {
+      color: var(--muted);
       font-weight: 600;
-      font-size: 22px;
+      font-size: 13px;
+      letter-spacing: 0.01em;
+      margin-bottom: 10px;
+      text-align: center;
     }
-    .origin { 
-      color: #1e293b; 
-      font-weight: 600; 
-      margin-bottom: 6px; 
-      font-size: 16px; 
+
+    /* The origin IS the hero: what the user must verify before allowing. */
+    .origin {
+      font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+      font-weight: 650;
+      font-size: 15.5px;
+      color: var(--ink);
+      background: var(--accent-soft);
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-align: center;
       word-break: break-all;
+      line-height: 1.35;
+      margin-bottom: 6px;
     }
-    .action { 
-      color: #64748b; 
-      margin-bottom: 8px; 
-      font-size: 14px; 
-      font-weight: 500;
+
+    .action {
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.45;
+      margin-bottom: 18px;
     }
-    .username { 
-      color: #64748b; 
-      margin-bottom: 28px; 
-      font-size: 13px; 
+
+    .action strong { color: var(--ink); font-weight: 620; }
+
+    #unlock-section {
+      display: none;
+      margin-bottom: 16px;
+      animation: cardIn 0.2s ease-out;
     }
-    .buttons { 
-      display: flex; 
-      gap: 12px; 
-      justify-content: center; 
+    #unlock-section.show { display: block; }
+
+    #unlock-section p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 7px;
+      font-weight: 550;
     }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 11px 13px;
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      color: var(--ink);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    input::placeholder { color: var(--muted); opacity: 0.85; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+
     button {
       flex: 1;
-      padding: 12px 0;
+      padding: 11px 0;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: background 0.18s ease, transform 0.12s ease, border-color 0.18s ease;
     }
-    .allow { 
-      background: #3b5bdb; 
-      color: #ffffff; 
-      box-shadow: 0 4px 6px -1px rgba(59, 91, 219, 0.1);
+    button:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+    button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+    button:disabled { opacity: 0.7; cursor: wait; }
+
+    .allow {
+      background: var(--accent);
+      color: var(--accent-contrast);
+      box-shadow: 0 1px 2px rgba(28, 32, 54, 0.12);
     }
-    .allow:hover {
-      background: #364fc7;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 8px -1px rgba(59, 91, 219, 0.15);
+    .allow:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .deny {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
     }
-    .deny { 
-      background: #f1f5f9; 
-      color: #64748b; 
-      border: 1px solid #e2e8f0;
+    .deny:hover:not(:disabled) { background: var(--bg); border-color: var(--border-strong); }
+
+    #view-error {
+      display: none;
+      text-align: center;
     }
-    .deny:hover {
-      background: #e2e8f0;
-      color: #1e293b;
+    #view-error.show { display: block; animation: cardIn 0.2s ease-out; }
+
+    #view-error h2 { color: var(--danger); }
+
+    #view-error p {
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.45;
+      margin-bottom: 12px;
+    }
+
+    #error-code-input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 8px;
+      color: var(--danger);
+      font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      text-align: center;
+    }
+
+    .support-link {
+      color: var(--accent-text);
+      font-size: 12px;
+      text-decoration: none;
+      font-weight: 550;
+    }
+    .support-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    #error-copy-btn {
+      width: 100%;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+    }
+    .consent-branding {
+      margin-top: 14px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .consent-branding strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="icon">🔑</div>
-    <h2>Passkey Request</h2>
-    <div class="origin" id="origin"></div>
-    <div class="action" id="action"></div>
-    <div class="username" id="username"></div>
-    <div id="unlock-section" style="display: none; margin-bottom: 20px;">
-      <p style="font-size: 13px; color: #ef4444; margin-bottom: 8px; font-weight: 500;">Vault is locked. Enter password:</p>
-      <input type="password" id="unlock-password" placeholder="Master Password" style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; outline: none;" />
+    <div id="view-confirm">
+      <div class="mark" aria-hidden="true">
+        <img src="icons/icon-48.png" alt="Zenith Passkeys" class="mark-img" width="48" height="48">
+      </div>
+      <h2>Zenith Passkeys</h2>
+      <div class="origin" id="origin"></div>
+      <p class="action" id="action"></p>
+      <div id="unlock-section">
+        <p>Vault is locked. Enter your master password:</p>
+        <input type="password" id="unlock-password" placeholder="Master Password" />
+      </div>
+      <div class="buttons">
+        <button class="deny" id="btn-deny">Deny</button>
+        <button class="allow" id="btn-allow">Allow</button>
+      </div>
+      <div class="consent-branding">
+        Built and managed by <strong>Zenith Open Source Projects</strong>
+      </div>
     </div>
-    <div class="buttons">
-      <button class="deny" id="btn-deny">Deny</button>
-      <button class="allow" id="btn-allow">Allow</button>
-    </div>
-    <div id="view-error" style="display: none;">
-      <h2 style="color: #ef4444; font-size: 18px;">⚠️ Error Occurred</h2>
-      <p style="color: #64748b; font-size: 13px; margin-bottom: 12px; line-height: 1.4;">We are sorry for the issue. Please provide this error code for assistance:</p>
-      <input type="text" id="error-code-input" readonly style="width: 100%; padding: 10px; margin-bottom: 12px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; color: #ef4444; font-family: monospace; font-size: 12px; text-align: center;" />
+
+    <div id="view-error">
+      <h2>Something went wrong</h2>
+      <p>Please share this error code for support:</p>
+      <input type="text" id="error-code-input" readonly />
+      <p><a class="support-link" href="mailto:zenithprojects@icloud.com">zenithprojects@icloud.com</a></p>
       <button class="deny" id="error-copy-btn">Copy Error Code</button>
     </div>
   </div>
